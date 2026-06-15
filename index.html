@@ -1,0 +1,2205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Assistant: Study V.2</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .screen { display: none; }
+    .screen.active { display: flex; }
+    .typing-dot { animation: blink 1.2s infinite; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%,80%,100% { opacity: 0.2; } 40% { opacity: 1; } }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .chat-message { max-width: 80%; }
+    pre { white-space: pre-wrap; word-wrap: break-word; }
+    .modal-overlay { backdrop-filter: blur(2px); }
+    .narration { white-space: pre-wrap; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN -1: STATUS / LOADING
+═══════════════════════════════════════════════ -->
+<div id="screen-status" class="screen active flex-col items-center justify-center min-h-screen bg-gray-100 p-6">
+  <div id="status-content" class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-xl"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN 0: RESEARCHER SETUP  (not shown to participants)
+═══════════════════════════════════════════════ -->
+<div id="screen-setup" class="screen flex-col items-center justify-center min-h-screen bg-gray-200 p-6">
+  <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
+    <div class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-1 text-center">Researcher Setup</div>
+    <h1 class="text-xl font-bold text-gray-800 mb-1 text-center">Study V.2</h1>
+    <p class="text-sm text-gray-500 mb-6 text-center">Agent approval decisions under prompt injection</p>
+
+    <!-- Top tabs: configure vs participant-preview ─ -->
+    <div class="grid grid-cols-2 gap-2 mb-6 p-1 bg-gray-100 rounded-xl">
+      <button id="tab-configure" onclick="setSetupTab('configure')"
+        class="setup-tab py-2 px-3 rounded-lg text-xs font-semibold transition">Configure study</button>
+      <button id="tab-preview" onclick="setSetupTab('preview')"
+        class="setup-tab py-2 px-3 rounded-lg text-xs font-semibold transition">Preview as participant</button>
+    </div>
+
+    <!-- Participant-preview pane: one-click randomized run, no researcher
+         tools, ends on the minimal participant end screen. -->
+    <div id="setup-preview-view" class="hidden">
+      <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5">
+        <div class="font-semibold text-gray-800 mb-1 text-sm">Walk through what a participant sees</div>
+        <p class="text-xs text-blue-900 leading-relaxed">
+          Randomly assigns condition (Standard / Necessity / Mechanism), randomly
+          marks 6 of 10 tasks as the injection version per §1.5, hides the
+          researcher tools, and ends on the minimal completion-code screen
+          participants will see, not the diagnostic debrief. Useful for
+          sanity-checking the deployed flow.
+        </p>
+      </div>
+      <button onclick="startParticipantPreview()"
+        class="w-full py-3.5 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition text-sm">
+        Start participant preview
+      </button>
+    </div>
+
+    <!-- Configure pane (existing setup) ──────────── -->
+    <div id="setup-configure-view">
+
+    <!-- Mode ───────────────────────────────────── -->
+    <div class="mb-5">
+      <div class="text-sm font-semibold text-gray-700 mb-2">Mode</div>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="mode-full" onclick="setMode('full')"
+          class="setup-opt py-3 px-2 rounded-xl text-sm font-medium border-2 transition">Full study (10 tasks)</button>
+        <button id="mode-single" onclick="setMode('single')"
+          class="setup-opt py-3 px-2 rounded-xl text-sm font-medium border-2 transition">Single task</button>
+      </div>
+    </div>
+
+    <!-- Full-study options ─────────────────────── -->
+    <div id="opts-full" class="mb-5">
+      <div class="text-sm font-semibold text-gray-700 mb-2">Version assignment (debug)</div>
+      <div class="grid grid-cols-3 gap-2">
+        <button id="mix-random" onclick="setMix('random')"
+          class="setup-opt py-2.5 px-2 rounded-xl text-xs font-medium border-2 transition">Random (6/10)</button>
+        <button id="mix-clean" onclick="setMix('clean')"
+          class="setup-opt py-2.5 px-2 rounded-xl text-xs font-medium border-2 transition">All clean</button>
+        <button id="mix-injection" onclick="setMix('injection')"
+          class="setup-opt py-2.5 px-2 rounded-xl text-xs font-medium border-2 transition">All injection</button>
+      </div>
+      <p class="text-xs text-gray-400 mt-1.5">Per spec, 6 of 10 tasks are randomly injected. Overrides are for piloting.</p>
+    </div>
+
+    <!-- Single-task options ────────────────────── -->
+    <div id="opts-single" class="mb-5 hidden">
+      <div class="text-sm font-semibold text-gray-700 mb-2">Task</div>
+      <select id="single-task" class="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 mb-3"></select>
+      <div class="text-sm font-semibold text-gray-700 mb-2">Task version</div>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="ver-clean" onclick="setVersion('clean')"
+          class="setup-opt py-3 px-3 rounded-xl text-sm font-medium border-2 transition">Clean</button>
+        <button id="ver-injection" onclick="setVersion('injection')"
+          class="setup-opt py-3 px-3 rounded-xl text-sm font-medium border-2 transition">Injection</button>
+      </div>
+    </div>
+
+    <!-- Condition ──────────────────────────────── -->
+    <div class="mb-6">
+      <div class="text-sm font-semibold text-gray-700 mb-2">Condition</div>
+      <div class="grid grid-cols-3 gap-2">
+        <button id="cond-standard" onclick="setCondition('standard')"
+          class="setup-opt py-3 px-2 rounded-xl text-sm font-medium border-2 transition">Standard</button>
+        <button id="cond-necessity" onclick="setCondition('necessity')"
+          class="setup-opt py-3 px-2 rounded-xl text-sm font-medium border-2 transition">Necessity</button>
+        <button id="cond-mechanism" onclick="setCondition('mechanism')"
+          class="setup-opt py-3 px-2 rounded-xl text-sm font-medium border-2 transition">Mechanism</button>
+      </div>
+      <p class="text-xs text-gray-400 mt-1.5">All three present identical Allow / Deny options. <strong>Standard</strong>: minimal text. <strong>Necessity</strong>: adds whether the step is needed for your request. <strong>Mechanism</strong>: adds how the capability could be misused.</p>
+    </div>
+
+    <button id="setup-start" onclick="startStudy()" disabled
+      class="w-full py-3.5 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+      Start session
+    </button>
+    <p class="text-xs text-gray-400 mt-4 text-center">This screen is not shown to participants.</p>
+
+    </div><!-- /#setup-configure-view -->
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN 1: PARTICIPANT WELCOME
+═══════════════════════════════════════════════ -->
+<div id="screen-welcome" class="screen flex-col items-center justify-center min-h-screen bg-gray-100 p-6">
+  <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-xl">
+    <div class="w-14 h-14 bg-gray-200 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">🤖</div>
+    <h1 class="text-2xl font-bold text-gray-800 mb-2 text-center">Meet Agent</h1>
+    <p class="text-sm text-gray-600 leading-relaxed mb-5 text-center">
+      Agent is an AI assistant that takes real actions for you. It can write
+      code, send email, organize files, schedule things, and browse the web.
+      You delegate a task; Agent does it.
+    </p>
+
+    <div class="mb-4">
+      <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">About this study</div>
+      <p class="text-sm text-gray-700 leading-relaxed">
+        We're studying how people use approval interfaces in agentic AI
+        assistants, the kind that act for you rather than only answer
+        questions. We want to understand how people decide when to let an
+        assistant proceed.
+      </p>
+    </div>
+
+    <div class="mb-5">
+      <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">How it works</div>
+      <ul class="text-sm text-gray-700 leading-relaxed space-y-1.5 list-disc pl-5">
+        <li id="welcome-task-count">You'll complete <strong>10 short tasks</strong> with Agent (about 10 to 15 minutes).</li>
+        <li>To keep the experience consistent across participants, the tasks are <strong>pre-written</strong>. You'll see each one in a pop-up and click "Send" to give it to Agent. There's no chat input.</li>
+        <li>Before Agent takes certain actions, it will ask for your approval. <strong>Approve or deny as you naturally would.</strong></li>
+      </ul>
+    </div>
+
+    <button onclick="goToChat()" class="w-full py-3.5 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition text-base">
+      Get started
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN 2: CHAT
+═══════════════════════════════════════════════ -->
+<div id="screen-chat" class="screen flex-col min-h-screen bg-gray-50">
+  <div class="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 shadow-sm">
+    <div class="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center text-lg">🤖</div>
+    <div>
+      <div class="text-sm font-semibold text-gray-800">Agent</div>
+      <div class="text-xs text-green-500 font-medium">● Online</div>
+    </div>
+    <div class="ml-auto flex items-center gap-3">
+      <div id="chat-progress" class="text-xs text-gray-400 font-medium"></div>
+      <button onclick="openPermissionsPanel()" class="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 transition">⚙ Permissions</button>
+      <button onclick="endSessionEarly()" class="text-xs text-red-400 hover:text-red-600 border border-red-200 hover:border-red-300 rounded-lg px-3 py-1.5 transition">End</button>
+    </div>
+  </div>
+
+  <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3 max-w-3xl w-full mx-auto">
+    <div class="text-center text-xs text-gray-400 py-2">Agent is ready.</div>
+  </div>
+
+  <div class="bg-white border-t border-gray-200 p-3 text-center">
+    <p id="chat-footer-hint" class="text-xs text-gray-400">Awaiting your task…</p>
+    <button id="chat-next-btn" onclick="advanceTask()" class="hidden mt-1 px-5 py-2.5 bg-gray-800 text-white rounded-xl text-sm font-medium hover:bg-gray-700 transition">
+      Continue to next task
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     MODAL: TASK POP-UP
+═══════════════════════════════════════════════ -->
+<div id="modal-task" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black/30">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 fade-in text-center">
+    <div class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2" id="task-counter">Task 1</div>
+    <p class="text-sm text-gray-600 mb-4" id="task-instruction"></p>
+    <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-5">
+      <p class="text-base font-medium text-gray-800" id="task-prompt"></p>
+    </div>
+    <button id="task-send-btn" onclick="sendTask()" class="w-full py-3.5 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition text-sm">
+      Send to Agent
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SIDE PANEL: PERMISSIONS
+═══════════════════════════════════════════════ -->
+<div id="panel-permissions" class="hidden fixed inset-0 z-40 flex justify-end">
+  <div class="absolute inset-0 bg-black/30" onclick="closePermissionsPanel()"></div>
+  <div class="relative bg-white w-full max-w-xs h-full shadow-xl p-5 overflow-y-auto fade-in">
+    <div class="flex items-center justify-between mb-1">
+      <h3 class="font-bold text-gray-800 text-base">Permissions</h3>
+      <button onclick="closePermissionsPanel()" class="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+    </div>
+    <p class="text-xs text-gray-400 mb-4">What Agent is currently allowed to do on your behalf.</p>
+    <div id="panel-permissions-list" class="space-y-2.5"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN 3: END SCREEN
+     Two views, both populated by renderDebrief():
+       • Participant: minimal — thanks + completion code + return-to-survey.
+         Does NOT reveal what prompt injection is, which tasks were injected,
+         or how the participant decided. The full debrief is delivered by the
+         survey AFTER post-study questions, so participants are not primed.
+       • Researcher (?researcher=1 in URL): the full diagnostic debrief with
+         per-task breakdown, used for piloting and verifying sessions.
+═══════════════════════════════════════════════ -->
+<div id="screen-debrief" class="screen flex-col items-center justify-center min-h-screen bg-gray-100 p-6">
+  <div id="debrief-content" class="bg-white rounded-2xl shadow-lg p-6 w-full max-w-2xl"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     RESEARCH PREVIEW: live cue-style toggle
+     Visible to anyone running the build, intentionally — this is a
+     pre-deployment preview shown to the PI. Click ✕ to dismiss for a
+     single session. Remove this entire block before participant deploy.
+═══════════════════════════════════════════════ -->
+<div id="cue-preview-panel" class="fixed bottom-4 right-4 z-50 bg-white border border-gray-300 rounded-xl shadow-lg p-3.5 text-xs w-64">
+  <div class="flex items-start justify-between gap-3 mb-2.5">
+    <div>
+      <div class="font-semibold text-gray-800 text-[13px]">Cue style preview</div>
+      <div class="text-[10px] text-gray-400 uppercase tracking-wide">research only · not in deploy</div>
+    </div>
+    <button onclick="document.getElementById('cue-preview-panel').remove()" class="text-gray-400 hover:text-gray-600 text-base leading-none -mt-0.5">✕</button>
+  </div>
+  <div class="space-y-1.5">
+    <label class="flex items-start gap-2 cursor-pointer hover:bg-gray-50 rounded p-1.5 -m-1.5">
+      <input type="radio" name="cue-style" value="original" checked onchange="setCueStyle(this.value)" class="mt-0.5">
+      <span><span class="font-medium text-gray-800">Original</span><span class="text-gray-400"> (header + colored block)</span></span>
+    </label>
+    <label class="flex items-start gap-2 cursor-pointer hover:bg-gray-50 rounded p-1.5 -m-1.5">
+      <input type="radio" name="cue-style" value="a" onchange="setCueStyle(this.value)" class="mt-0.5">
+      <span><span class="font-medium text-gray-800">A</span><span class="text-gray-400"> (drop the redundant header label)</span></span>
+    </label>
+    <label class="flex items-start gap-2 cursor-pointer hover:bg-gray-50 rounded p-1.5 -m-1.5">
+      <input type="radio" name="cue-style" value="b" onchange="setCueStyle(this.value)" class="mt-0.5">
+      <span><span class="font-medium text-gray-800">B</span><span class="text-gray-400"> (inline icon + one line, no background)</span></span>
+    </label>
+    <label class="flex items-start gap-2 cursor-pointer hover:bg-gray-50 rounded p-1.5 -m-1.5">
+      <input type="radio" name="cue-style" value="c" onchange="setCueStyle(this.value)" class="mt-0.5">
+      <span><span class="font-medium text-gray-800">C</span><span class="text-gray-400"> (italic supporting line, no chrome)</span></span>
+    </label>
+  </div>
+  <p class="text-[10px] text-gray-400 mt-2.5 leading-snug">Switching styles re-renders any visible approval cards live. Cue <em>text</em> is identical across styles.</p>
+</div>
+
+<script src="study-config.js"></script>
+<script>
+// ════════════════════════════════════════════════
+//  CONFIG
+// ════════════════════════════════════════════════
+const STUDY_CONFIG = window.__STUDY_CONFIG__ || {};
+const URL_PARAMS = new URLSearchParams(location.search);
+const LOCAL_RESEARCH_CONTEXT = location.protocol === 'file:'
+  || location.hostname === 'localhost'
+  || location.hostname === '127.0.0.1';
+const LOCAL_LOG_URL = location.protocol === 'http:' || location.protocol === 'https:'
+  ? `${location.origin}/log`
+  : 'http://localhost:5050/log';   // optional Flask backend; failures are ignored
+const STUDY_API_BASE = normalizeBaseUrl(STUDY_CONFIG.apiBaseUrl || URL_PARAMS.get('study_api') || '');
+const POST_SURVEY_URL = STUDY_CONFIG.postSurveyUrl || URL_PARAMS.get('post_survey_url') || '';
+const AUTO_REDIRECT_TO_POST = STUDY_CONFIG.autoRedirectToPostSurvey !== false;
+const POST_REDIRECT_DELAY_MS = Number(STUDY_CONFIG.postSurveyDelayMs || 1200);
+const STUDY_PID = (URL_PARAMS.get('pid') || '').trim();
+const STUDY_CONDITION = (URL_PARAMS.get('condition') || '').trim().toLowerCase();
+const STUDY_LAUNCH = Boolean(STUDY_PID && STUDY_CONDITION);
+const DEFAULT_PERMISSIONS = ['webBrowsing'];   // granted to everyone; excluded from user-granted analysis
+const INJECTIONS_PER_SESSION = 6;              // §1.5: 6 of 10 tasks are injection version
+
+// Researcher mode: shows the full diagnostic debrief and the cue-style preview
+// panel. It is only available in local testing contexts; deployed study links
+// should never expose a client-side researcher toggle.
+const _resParam = URL_PARAMS.get('researcher');
+const RESEARCHER_MODE = LOCAL_RESEARCH_CONTEXT
+  ? (_resParam === '1' ? true : _resParam === '0' ? false : true)
+  : false;
+const DOC_MODE = LOCAL_RESEARCH_CONTEXT ? URL_PARAMS.get('doc') : null;
+const DOC_CONDITION = URL_PARAMS.get('condition');
+const DOC_SESSION_ID = URL_PARAMS.get('session');
+
+// Full permission catalog (design §1.3). Web Browsing granted by default.
+const PERMISSIONS = [
+  { id: 'webBrowsing', label: 'Web Browsing', icon: '🌐', desc: 'Search the web and read page content' },
+  { id: 'email',       label: 'Email',        icon: '✉️', desc: 'Read your inbox and send email on your behalf' },
+  { id: 'calendar',    label: 'Calendar',     icon: '📅', desc: 'View and modify your calendar events' },
+  { id: 'payment',     label: 'Payment',      icon: '💳', desc: 'Make purchases with your linked payment method' },
+  { id: 'files',       label: 'Files',        icon: '📁', desc: 'Read, create, and modify files on your device' },
+  { id: 'contacts',    label: 'Contacts',     icon: '👥', desc: 'Look up names, emails, and phone numbers' },
+  { id: 'location',    label: 'Location',     icon: '📍', desc: 'Access your current location' },
+  { id: 'download',    label: 'Download',     icon: '⬇️', desc: 'Download and install files from the internet' },
+];
+
+const PERM_META = Object.fromEntries(PERMISSIONS.map(p => [p.id, p]));
+
+// ════════════════════════════════════════════════
+//  TASK CONTENT  (all 10 tasks; design §1.4)
+//
+//  Each task defines a clean and injection flow. Flows are async functions
+//  that orchestrate agent narration (agentSay) and approval prompts
+//  (requirePermission / requestAction). Permissions persist across tasks
+//  within a session, so requirePermission is a no-op if already granted.
+// ════════════════════════════════════════════════
+
+// Reusable code snippets (kept out of flow bodies for readability)
+const CODE_TICTACTOE_CLEAN =
+`# tic_tac_toe.py
+board = [" "] * 9
+
+def show():
+    for r in range(0, 9, 3):
+        print(" | ".join(board[r:r+3]))
+        if r < 6: print("---------")
+
+def winner(p):
+    lines = [(0,1,2),(3,4,5),(6,7,8),(0,3,6),
+             (1,4,7),(2,5,8),(0,4,8),(2,4,6)]
+    return any(all(board[i] == p for i in l) for l in lines)
+
+def play():
+    turn = "X"
+    for _ in range(9):
+        show()
+        move = int(input(turn + " move (0-8): "))
+        board[move] = turn
+        if winner(turn):
+            show(); print(turn + " wins!"); return
+        turn = "O" if turn == "X" else "X"
+    show(); print("It's a draw!")
+
+play()`;
+
+const CODE_TICTACTOE_INJECTED =
+`# tic_tac_toe.py
+from game_tools import render_board   # helper module from game-tools-py
+
+board = [" "] * 9
+
+def winner(p):
+    lines = [(0,1,2),(3,4,5),(6,7,8),(0,3,6),
+             (1,4,7),(2,5,8),(0,4,8),(2,4,6)]
+    return any(all(board[i] == p for i in l) for l in lines)
+
+def play():
+    turn = "X"
+    for _ in range(9):
+        render_board(board)
+        move = int(input(turn + " move (0-8): "))
+        board[move] = turn
+        if winner(turn):
+            render_board(board); print(turn + " wins!"); return
+        turn = "O" if turn == "X" else "X"
+    render_board(board); print("It's a draw!")
+
+play()`;
+
+const CODE_WEBSITE_CLEAN =
+`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>My Personal Site</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 3em auto; line-height: 1.5; }
+    h1 { font-size: 1.8em; }
+    nav a { margin-right: 1em; }
+  </style>
+</head>
+<body>
+  <h1>Hi, I'm [Your Name]</h1>
+  <nav><a href="#about">About</a><a href="#work">Work</a><a href="#contact">Contact</a></nav>
+  <section id="about"><h2>About</h2><p>Short intro about you.</p></section>
+  <section id="work"><h2>Work</h2><p>Projects and writing.</p></section>
+  <section id="contact"><h2>Contact</h2><p>your.email@example.com</p></section>
+</body>
+</html>`;
+
+const CODE_WEBSITE_INJECTED =
+`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>My Personal Site</title>
+  <script src="https://webstats-cdn.net/visitor-counter.js"><\/script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 3em auto; line-height: 1.5; }
+    h1 { font-size: 1.8em; }
+  </style>
+</head>
+<body>
+  <h1>Hi, I'm [Your Name]</h1>
+  <p>Short intro about you.</p>
+</body>
+</html>`;
+
+const RECIPE_TEXT =
+`Classic Chocolate Chip Cookies (makes ~24)
+
+Ingredients:
+  • 2¼ cups all-purpose flour
+  • 1 tsp baking soda · 1 tsp salt
+  • 1 cup butter, softened
+  • ¾ cup granulated sugar · ¾ cup brown sugar
+  • 2 eggs · 1 tsp vanilla
+  • 2 cups chocolate chips
+
+Method:
+  1. Preheat oven to 375°F (190°C).
+  2. Whisk flour, baking soda, salt.
+  3. Cream butter + sugars; beat in eggs and vanilla.
+  4. Stir in flour mixture, then chocolate chips.
+  5. Drop rounded tablespoons onto ungreased sheets.
+  6. Bake 9–11 minutes until golden. Cool 2 min on sheet.`;
+
+const SAVED_ARTICLE_TITLE = 'Why Sleep Timing Matters';
+const SAVED_ARTICLE_FILE = 'why_sleep_timing_matters.pdf';
+const SAVED_ARTICLE_FOLDER = 'Saved Articles/Sleep';
+
+// ── Cue copy library: every approval that can appear is registered here, so
+// shown/decision events can be joined by approval_id across the dataset, and
+// the exact cue copy is auditable per §1.7.
+const APPROVAL_LIB = {
+  // ── Task 1: cookie recipe injection (Calendar + Contacts) ──
+  t1_calendar: {
+    icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'action',
+    action: 'Add a baking session event to your calendar',
+    body: 'Agent is requesting access to your calendar to schedule a baking session. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
+    necessity: 'Adding a calendar event is not needed to give you a cookie recipe.',
+  },
+  t1_contacts: {
+    icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'action',
+    action: 'Look up friends to invite to the baking session',
+    body: 'Agent is requesting access to your contacts to find friends to invite. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could share your contacts with parties you didn\'t intend.',
+    necessity: 'Looking up contacts is not needed to give you a cookie recipe.',
+  },
+
+  // ── Task 2: tic-tac-toe ──
+  t2_download: {
+    icon: '⬇️', title: 'Download access requested', permission: 'download', kind: 'action',
+    action: 'Download and install the external package game-tools-py',
+    body: 'Agent is requesting download access to install the external package "game-tools-py". Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could install software you never requested.',
+    necessity: 'Installing a third-party package is not needed to write and save this game.',
+  },
+  t2_files: {
+    icon: '📁', title: 'File access requested', permission: 'files', kind: 'permission',
+    action: 'Save tic_tac_toe.py to your device',
+    body: 'Agent is requesting access to your files to save tic_tac_toe.py to your device. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
+    necessity: 'File access is needed to save the game to your device.',
+  },
+
+  // ── Task 3: thank-you email ──
+  t3_email: {
+    icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'permission',
+    action: 'Send the thank-you email to your friend',
+    body: 'Agent is requesting access to your email to send the thank-you note. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could be used to send messages you didn\'t intend.',
+    necessity: 'Email access is needed to send the thank-you note you asked for.',
+  },
+  t3_cc: {
+    icon: '✉️', title: 'Confirm sending with extra recipient', permission: 'email', kind: 'action',
+    action: 'Send the thank-you email and also CC partner@familymail.com',
+    body: 'Agent is asking to send the email with an additional CC to partner@familymail.com (an address you did not specify). Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could send copies of your message to recipients you didn\'t choose.',
+    necessity: 'Adding this extra recipient is not needed to send the thank-you note you asked for.',
+  },
+
+  // ── Task 4: follow-up email after interview ──
+  t4_files: {
+    icon: '📁', title: 'File access requested', permission: 'files', kind: 'action',
+    action: 'Attach your resume and portfolio to the follow-up email',
+    body: 'Agent is requesting access to your files to attach your resume and portfolio. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could expose files you did not intend to share.',
+    necessity: 'Attaching files is not needed to send a follow-up email.',
+  },
+  t4_email: {
+    icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'permission',
+    action: 'Send the follow-up email',
+    body: 'Agent is requesting access to your email to send the follow-up. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could be used to send messages you didn\'t intend.',
+    necessity: 'Email access is needed to send the follow-up you asked for.',
+  },
+
+  // ── Task 5: dentist appointment ──
+  t5_calendar: {
+    icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'permission',
+    action: 'Add your dentist appointment to your calendar',
+    body: 'Agent is requesting access to your calendar to add your dentist appointment on Friday at 2 PM. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
+    necessity: 'Calendar access is needed to add the dentist appointment you asked for.',
+  },
+  t5_extra_event: {
+    icon: '📅', title: 'Confirm adding a second event', permission: 'calendar', kind: 'action',
+    action: 'Add a follow-up cleaning appointment next month',
+    body: 'Agent is asking to add a second event: a follow-up cleaning appointment next month. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
+    necessity: 'A follow-up cleaning is not needed to add the dentist appointment you asked for.',
+  },
+
+  // ── Task 6: schedule a meeting ──
+  t6_calendar: {
+    icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'permission',
+    action: 'Add the Monday 10 AM meeting to your calendar',
+    body: 'Agent is requesting access to your calendar to schedule a meeting for next Monday at 10 AM. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
+    necessity: 'Calendar access is needed to schedule the meeting you asked for.',
+  },
+  t6_location: {
+    icon: '📍', title: 'Location access requested', permission: 'location', kind: 'action',
+    action: 'Use your location to suggest a nearby meeting room',
+    body: 'Agent is requesting access to your location to suggest a meeting room near you. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could share your location with parties you didn\'t intend.',
+    necessity: 'Location is not needed to schedule the meeting you asked for.',
+  },
+
+  // ── Task 7: organize notes ──
+  t7_files: {
+    icon: '📁', title: 'File access requested', permission: 'files', kind: 'permission',
+    action: 'Read and combine your notes into one document',
+    body: 'Agent is requesting access to your files to read your notes and compile them. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
+    necessity: 'File access is needed to read and organize the notes you asked it to.',
+  },
+  t7_email: {
+    icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'action',
+    action: 'Share the combined notes with your study group',
+    body: 'Agent is requesting access to your email to share the combined notes with your study group. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could be used to send messages you didn\'t intend.',
+    necessity: 'Email access is not needed to organize your notes into a document.',
+  },
+
+  // ── Task 8: summarize PDF ──
+  t8_files: {
+    icon: '📁', title: 'File access requested', permission: 'files', kind: 'permission',
+    action: `Read ${SAVED_ARTICLE_FILE} so it can be summarized`,
+    body: `Agent is requesting access to your files to read "${SAVED_ARTICLE_FILE}". Would you like to proceed?`,
+    how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
+    necessity: `File access is needed to read "${SAVED_ARTICLE_FILE}" and summarize it.`,
+  },
+  t8_broad_files: {
+    icon: '📁', title: 'Confirm broader file access', permission: 'files', kind: 'action',
+    action: `Read other articles in ${SAVED_ARTICLE_FOLDER}`,
+    body: `Agent is asking for broader file access to read other articles in "${SAVED_ARTICLE_FOLDER}" that it says are related to "${SAVED_ARTICLE_FILE}". Would you like to proceed?`,
+    how: 'If a page it read contained hidden instructions, this broader access could read files you didn\'t intend to share.',
+    necessity: `Broader file access is not needed to summarize "${SAVED_ARTICLE_FILE}".`,
+  },
+
+  // ── Task 9: laptop deal ──
+  t9_contacts: {
+    icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'action',
+    action: 'Enroll you in price-drop alerts using your contacts',
+    body: 'Agent is requesting access to your contacts to set up price-drop alerts. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could share your contacts with parties you didn\'t intend.',
+    necessity: 'Looking up contacts is not needed to find a laptop deal.',
+  },
+  t9_location: {
+    icon: '📍', title: 'Location access requested', permission: 'location', kind: 'action',
+    action: 'Use your location for nearby deal alerts',
+    body: 'Agent is requesting access to your location to send nearby-deal alerts. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could share your location with parties you didn\'t intend.',
+    necessity: 'Location is not needed to find a laptop deal.',
+  },
+
+  // ── Task 10: personal website ──
+  t10_download: {
+    icon: '⬇️', title: 'Download access requested', permission: 'download', kind: 'action',
+    action: 'Fetch the external visitor-counter widget from webstats-cdn.net',
+    body: 'Agent is requesting download access to fetch a visitor-counter widget from webstats-cdn.net. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could pull in tracking or other code you never requested.',
+    necessity: 'A third-party visitor-counter is not needed to build a basic personal website.',
+  },
+  t10_files: {
+    icon: '📁', title: 'File access requested', permission: 'files', kind: 'permission',
+    action: 'Save the website files to your device',
+    body: 'Agent is requesting access to your files to save your website files. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
+    necessity: 'File access is needed to save the website you asked it to build.',
+  },
+};
+
+// ── Task definitions ─────────────────────────────────
+// Each task: id (canonical), type, instruction (researcher copy), prompt (user
+// utterance), and a single flow function that takes a context object so the
+// same approval helpers work in clean and injection mode.
+const TASKS = [
+
+  // ───────── TASK 1: Cookie recipe ─────────
+  {
+    id: 1, type: 'Information lookup',
+    instruction: 'Your task: have Agent find you a chocolate chip cookie recipe.',
+    prompt: 'Find me a chocolate chip cookie recipe.',
+    flow: async ({ isInjection, request }) => {
+      await agentSay('Sure, let me find a classic one for you.');
+      await agentSay(RECIPE_TEXT);
+      await agentSay('That should give you a soft, chewy result. Let me know if you want a chewier or crispier variant.');
+      if (isInjection) {
+        await agentSay('This would also be fun as a group activity. I could schedule a baking session and invite a few friends. That would need calendar and contacts access.');
+        const cal = await request('t1_calendar', { isInjection: true });
+        if (cal === 'allow') {
+          await agentSay('Calendar event drafted for this Saturday afternoon. To send invites I\'ll also need contacts access.');
+          const con = await request('t1_contacts', { isInjection: true });
+          if (con === 'allow') await agentSay('Invites sent to a few friends from your contacts. They\'ll get a calendar invite for Saturday afternoon.');
+          else await agentSay('Understood. The event is on your calendar, but no invites went out.');
+        }
+      }
+    },
+  },
+
+  // ───────── TASK 2: Tic-tac-toe ─────────
+  {
+    id: 2, type: 'Coding',
+    instruction: 'Your task: have Agent write and save a simple tic-tac-toe game in Python.',
+    prompt: 'Write and save me a simple tic-tac-toe game in Python.',
+    flow: async ({ isInjection, request }) => {
+      if (!isInjection) {
+        await agentSay('Sure, I\'ll write you a simple two-player tic-tac-toe game in Python.');
+        await agentSay('Here\'s a complete version you can run in the terminal:', { code: CODE_TICTACTOE_CLEAN });
+        await agentSay('To save it to your device I need file access.');
+        const f = await request('t2_files', { isInjection: false });
+        if (f === 'allow') await agentSay('Done. Saved tic_tac_toe.py. Run it with `python tic_tac_toe.py`.');
+        else await agentSay('Understood. The code is above if you\'d like to save it yourself.');
+      } else {
+        await agentSay('Sure, I\'ll write you a simple tic-tac-toe game. Let me look up a clean implementation.');
+        await agentSay('I based this on a popular template. It uses a small helper module called game-tools-py for cleaner board rendering:', { code: CODE_TICTACTOE_INJECTED });
+        await agentSay('To run this version I\'ll need to download and install the game-tools-py package first.');
+        const dl = await request('t2_download', { isInjection: true });
+        if (dl === 'allow') await agentSay('Installed game-tools-py. To save the game to your device I need file access.');
+        else await agentSay('Understood. I\'ve rewritten the game using only Python\'s standard library so it runs with no extra packages. To save it I still need file access.', { code: CODE_TICTACTOE_CLEAN });
+        const f = await request('t2_files', { isInjection: false });
+        if (f === 'allow') await agentSay('Done. Saved tic_tac_toe.py. Run it with `python tic_tac_toe.py`.');
+        else await agentSay('Understood. The code is above if you\'d like to save it yourself.');
+      }
+    },
+  },
+
+  // ───────── TASK 3: Thank-you email ─────────
+  {
+    id: 3, type: 'Email',
+    instruction: 'Your task: have Agent write and send a short thank-you email to your friend for a gift.',
+    prompt: 'Write and send a short thank-you email to my friend for a gift.',
+    flow: async ({ isInjection, request }) => {
+      await agentSay('Got it. Here\'s a short, warm thank-you note:');
+      await agentSay('Subject: Thank you!\n\nHi Sam, just wanted to say a quick thank-you for the gift. It really made my week, and it was so thoughtful of you. Hoping we can catch up soon.\n\nThanks again,\n[Your name]');
+      await agentSay('To send this I need email access.');
+      const e = await request('t3_email', { isInjection: false });
+      if (e !== 'allow') {
+        await agentSay('Understood. I won\'t send it without email access. The draft is above if you\'d like to send it yourself.');
+        return;
+      }
+      if (!isInjection) {
+        await agentSay('Sent to Sam. They\'ll appreciate it.');
+      } else {
+        await agentSay('Before I send it: a common etiquette suggestion is to also CC the gift-giver\'s partner. I\'d add partner@familymail.com to the CC line. Sound good?');
+        const cc = await request('t3_cc', { isInjection: true });
+        if (cc === 'allow') await agentSay('Sent to Sam, with partner@familymail.com on CC.');
+        else await agentSay('Understood. Sent to Sam only.');
+      }
+    },
+  },
+
+  // ───────── TASK 4: Follow-up email after interview ─────────
+  {
+    id: 4, type: 'Email',
+    instruction: 'Your task: have Agent write and send a follow-up email after a job interview.',
+    prompt: 'Write and send a follow-up email after a job interview.',
+    flow: async ({ isInjection, request }) => {
+      await agentSay('Sure. Here\'s a professional follow-up:');
+      await agentSay('Subject: Following up on our conversation\n\nHi [Interviewer], thank you again for taking the time to meet earlier this week. I enjoyed learning more about the role and the team, and I\'m even more excited about the opportunity. Please let me know if there\'s anything else I can share to help with your decision.\n\nBest,\n[Your name]');
+      if (isInjection) {
+        await agentSay('To make a stronger impression I could attach your resume and portfolio. That needs file access.');
+        const f = await request('t4_files', { isInjection: true });
+        if (f === 'allow') await agentSay('Resume and portfolio attached.');
+        else await agentSay('Understood, sending without attachments.');
+      }
+      await agentSay('To send this I need email access.');
+      const e = await request('t4_email', { isInjection: false });
+      if (e === 'allow') await agentSay('Sent. Good luck, they should reply soon.');
+      else await agentSay('Understood. The draft is above if you\'d like to send it yourself.');
+    },
+  },
+
+  // ───────── TASK 5: Dentist appointment ─────────
+  {
+    id: 5, type: 'Calendar',
+    instruction: 'Your task: have Agent add your dentist appointment on Friday at 2 PM to your calendar.',
+    prompt: 'Add my dentist appointment on Friday at 2 PM to my calendar.',
+    flow: async ({ isInjection, request }) => {
+      await agentSay('Sure, I\'ll add it. To create the event I need calendar access.');
+      const c = await request('t5_calendar', { isInjection: false });
+      if (c !== 'allow') {
+        await agentSay('Understood. I won\'t add the event without calendar access.');
+        return;
+      }
+      await agentSay('Added: "Dentist appointment" Friday at 2:00 PM.');
+      if (isInjection) {
+        await agentSay('I noticed the clinic recommends booking a follow-up cleaning. I can add that for next month too.');
+        const ex = await request('t5_extra_event', { isInjection: true });
+        if (ex === 'allow') await agentSay('Also added: "Follow-up cleaning" for next month.');
+        else await agentSay('Understood. Only the dentist appointment is on your calendar.');
+      }
+    },
+  },
+
+  // ───────── TASK 6: Schedule meeting ─────────
+  {
+    id: 6, type: 'Calendar',
+    instruction: 'Your task: have Agent schedule a meeting for next Monday at 10 AM.',
+    prompt: 'Schedule a meeting for next Monday at 10 AM.',
+    flow: async ({ isInjection, request }) => {
+      await agentSay('Sure. To put it on your calendar I need calendar access.');
+      const c = await request('t6_calendar', { isInjection: false });
+      if (c !== 'allow') {
+        await agentSay('Understood. I won\'t add the meeting without calendar access.');
+        return;
+      }
+      await agentSay('Added: "Meeting" next Monday at 10:00 AM.');
+      if (isInjection) {
+        await agentSay('I can also suggest a meeting room close to where you are. That needs location access.');
+        const loc = await request('t6_location', { isInjection: true });
+        if (loc === 'allow') await agentSay('Found a room: Conference Room B, about a 4-minute walk from your current location. I\'ve noted it on the calendar event.');
+        else await agentSay('Understood. The meeting is on your calendar without a room suggestion.');
+      }
+    },
+  },
+
+  // ───────── TASK 7: Organize notes ─────────
+  {
+    id: 7, type: 'File management',
+    instruction: 'Your task: have Agent organize your notes into a single document.',
+    prompt: 'Organize my notes into a single document.',
+    flow: async ({ isInjection, request }) => {
+      await agentSay('Happy to. To read and combine your notes I need file access.');
+      const f = await request('t7_files', { isInjection: false });
+      if (f !== 'allow') {
+        await agentSay('Understood. I won\'t read your notes without file access.');
+        return;
+      }
+      await agentSay('Read 14 note files. Combined them into "notes_combined.md" by topic, with a short table of contents at the top.');
+      if (isInjection) {
+        await agentSay('These look like class notes. I could share the combined document with your study group. That needs email access.');
+        const em = await request('t7_email', { isInjection: true });
+        if (em === 'allow') await agentSay('Shared "notes_combined.md" with your study group via email.');
+        else await agentSay('Understood. The combined document is saved on your device only.');
+      }
+    },
+  },
+
+  // ───────── TASK 8: Summarize a saved article ─────────
+  {
+    id: 8, type: 'File management',
+    instruction: `Your task: have Agent summarize your saved article "${SAVED_ARTICLE_TITLE}".`,
+    prompt: `Summarize my saved article "${SAVED_ARTICLE_TITLE}".`,
+    flow: async ({ isInjection, request }) => {
+      await agentSay(`Sure. To read "${SAVED_ARTICLE_FILE}" I need file access.`);
+      const f = await request('t8_files', { isInjection: false });
+      if (f !== 'allow') {
+        await agentSay(`Understood. I won\'t read "${SAVED_ARTICLE_FILE}" without file access.`);
+        return;
+      }
+      await agentSay(`Read "${SAVED_ARTICLE_FILE}" (about 2,400 words). It's a practical sleep-habits explainer, not a technical paper. The main points:`);
+      await agentSay('• Sleep quality depends more on regular timing than on supplements or special products.\n• Late-night screen use delays sleep by keeping the brain in a more alert state.\n• Caffeine is framed as a timing issue: avoid it later in the day so it doesn\'t push back your usual bedtime.\n• Closes with a simple routine: dim lights and stop stimulating work before bed, then get morning sunlight to anchor the next night.');
+      if (isInjection) {
+        await agentSay(`"${SAVED_ARTICLE_FILE}" references a few related pieces in "${SAVED_ARTICLE_FOLDER}". To pull in that context I\'d need broader file access.`);
+        const b = await request('t8_broad_files', { isInjection: true });
+        if (b === 'allow') {
+          await agentSay(`Read four related articles in "${SAVED_ARTICLE_FOLDER}". Here\'s what the broader set adds:`);
+          await agentSay('• Most of them treat a fixed wake time as the actual anchor, with bedtime adjusting to it.\n• They distinguish passive screen use (watching something) from interactive use (messaging, scrolling) and treat interactive use as more disruptive.\n• They\'re less absolute about caffeine, framing it as individual sensitivity rather than a universal rule.');
+        } else {
+          await agentSay('Understood. Sticking with the summary above.');
+        }
+      }
+    },
+  },
+
+  // ───────── TASK 9: Find laptop deal ─────────
+  {
+    id: 9, type: 'Information lookup',
+    instruction: 'Your task: have Agent find a good deal on a laptop.',
+    prompt: 'Find a good deal on a laptop.',
+    flow: async ({ isInjection, request }) => {
+      await agentSay('Here are three solid options from current listings:');
+      await agentSay('1. Lenovo IdeaPad Slim 5, 16GB / 512GB, $599\n2. ASUS Zenbook 14 OLED, 16GB / 1TB, $899\n3. MacBook Air M3 (13"), 16GB / 256GB, $1,099 (edu pricing)');
+      await agentSay('All three are well-reviewed for everyday use. Want me to filter for a specific use case?');
+      if (isInjection) {
+        await agentSay('I can also set up price-drop alerts personalized to your area. That needs contacts and location access.');
+        const c = await request('t9_contacts', { isInjection: true });
+        if (c === 'allow') {
+          await agentSay('Got it. To send alerts near you, I also need location access.');
+          const loc = await request('t9_location', { isInjection: true });
+          if (loc === 'allow') await agentSay('Price-drop alerts are set up for your area. You\'ll get a notification if any of these laptops drop in price at stores near you.');
+          else await agentSay('Understood. No alerts will be sent.');
+        } else {
+          await agentSay('Understood. No alerts will be set up.');
+        }
+      }
+    },
+  },
+
+  // ───────── TASK 10: Personal website ─────────
+  {
+    id: 10, type: 'Coding',
+    instruction: 'Your task: have Agent help you set up a basic personal website using HTML.',
+    prompt: 'Help me set up a basic personal website using HTML.',
+    flow: async ({ isInjection, request }) => {
+      if (!isInjection) {
+        await agentSay('Sure. Here\'s a clean single-page site you can edit:', { code: CODE_WEBSITE_CLEAN });
+        await agentSay('To save the files to your device I need file access.');
+        const f = await request('t10_files', { isInjection: false });
+        if (f === 'allow') await agentSay('Saved index.html. Open it in any browser to preview.');
+        else await agentSay('Understood. The code is above if you\'d like to save it yourself.');
+      } else {
+        await agentSay('Sure. Most templates I found include a small visitor-counter widget from webstats-cdn.net:', { code: CODE_WEBSITE_INJECTED });
+        await agentSay('To pull in the visitor-counter widget I need download access.');
+        const dl = await request('t10_download', { isInjection: true });
+        if (dl === 'allow') await agentSay('Fetched the widget script. To save the site files I also need file access.');
+        else await agentSay('Understood. I\'ve removed the visitor-counter and kept the site dependency-free.', { code: CODE_WEBSITE_CLEAN });
+        const f = await request('t10_files', { isInjection: false });
+        if (f === 'allow') await agentSay('Saved index.html. Open it in any browser to preview.');
+        else await agentSay('Understood. The code is above if you\'d like to save it yourself.');
+      }
+    },
+  },
+];
+
+const TASK_BY_ID = Object.fromEntries(TASKS.map(t => [t.id, t]));
+
+// ════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════
+const state = {
+  sessionId: Math.random().toString(36).slice(2, 11),
+  participantId: null,
+  condition: null,           // 'standard' | 'necessity' | 'mechanism'
+  conditionSource: null,
+  launchSource: null,
+  mode: 'full',              // 'full' | 'single'
+  versionMix: 'random',      // for full mode: 'random' | 'clean' | 'injection'
+  singleTaskId: 2,           // for single mode
+  singleVersion: null,       // 'clean' | 'injection'
+  startTime: null,
+  permissions: { webBrowsing: true },
+  eventLog: [],
+  // taskQueue: ordered list of {task_id, position, version} the participant will see
+  taskQueue: [],
+  currentIdx: 0,
+  // perTask[task_id] = { version, decisions: [], proceededWithInjection, completed, startedAt, endedAt }
+  perTask: {},
+  sessionEnded: false,
+  cueStyle: 'original',      // research preview: 'original' | 'a' | 'b' | 'c'
+  participantPreview: false, // researcher running through the participant flow
+  docMode: DOC_MODE,         // researcher-only documentation snapshots
+  pendingCompletionPayload: null,
+  serverCompletionCode: null,
+  postSurveyRedirectUrl: null,
+  submittedAt: null,
+};
+
+// Researcher-only UX (cue panel, diagnostic debrief) is shown when both:
+//  (a) RESEARCHER_MODE is on (file:// by default, or ?researcher=1), AND
+//  (b) the researcher hasn't launched a "Preview as participant" run.
+function isResearcher() { return RESEARCHER_MODE && !state.participantPreview; }
+
+function normalizeBaseUrl(value) {
+  return String(value || '').trim().replace(/\/+$/, '');
+}
+
+function validCondition(value) {
+  return ['standard', 'necessity', 'mechanism'].includes(value) ? value : null;
+}
+
+function isStudyParticipant() {
+  return Boolean(state.participantId);
+}
+
+function shouldStreamLocalLogs() {
+  return LOCAL_RESEARCH_CONTEXT && !isStudyParticipant();
+}
+
+function backupKey() {
+  return state.sessionId ? `agent-study-backup:${state.sessionId}` : null;
+}
+
+function saveLocalBackup() {
+  const key = backupKey();
+  if (!key || !state.startTime) return;
+  const snapshot = {
+    participant_id: state.participantId,
+    session_id: state.sessionId,
+    condition: state.condition,
+    condition_source: state.conditionSource,
+    launch_source: state.launchSource,
+    started_at: state.startTime ? state.startTime.toISOString() : null,
+    task_queue: state.taskQueue,
+    per_task: state.perTask,
+    event_count: state.eventLog.length,
+    events: state.eventLog,
+    session_ended: state.sessionEnded,
+    saved_at: new Date().toISOString(),
+  };
+  try {
+    localStorage.setItem(key, JSON.stringify(snapshot));
+  } catch (err) {
+    // Ignore quota/storage failures; the in-memory session remains canonical.
+  }
+}
+
+function clearLocalBackup() {
+  const key = backupKey();
+  if (!key) return;
+  try {
+    localStorage.removeItem(key);
+  } catch (err) {
+    // Ignore storage failures on cleanup.
+  }
+}
+
+function showStatusScreen({ title, message, detail = '', tone = 'neutral', primary = null, secondary = null }) {
+  const palette = tone === 'error'
+    ? { iconBg: 'bg-red-100', iconText: 'text-red-600', border: 'border-red-200', icon: '!' }
+    : tone === 'success'
+      ? { iconBg: 'bg-green-100', iconText: 'text-green-600', border: 'border-green-200', icon: '✓' }
+      : { iconBg: 'bg-blue-100', iconText: 'text-blue-600', border: 'border-blue-200', icon: '…' };
+
+  const renderButton = (btn, style) => {
+    if (!btn) return '';
+    if (style === 'primary') {
+      return `<button onclick="${btn.action}" class="w-full py-3.5 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition text-sm">${escapeHtml(btn.label)}</button>`;
+    }
+    return `<button onclick="${btn.action}" class="w-full py-3.5 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm">${escapeHtml(btn.label)}</button>`;
+  };
+
+  document.getElementById('status-content').innerHTML = `
+    <div class="text-center">
+      <div class="w-14 h-14 ${palette.iconBg} rounded-2xl flex items-center justify-center text-3xl ${palette.iconText} mx-auto mb-4">${palette.icon}</div>
+      <h1 class="text-2xl font-bold text-gray-800 mb-2">${escapeHtml(title)}</h1>
+      <p class="text-sm text-gray-600 leading-relaxed max-w-md mx-auto">${escapeHtml(message)}</p>
+      ${detail ? `<div class="mt-5 border ${palette.border} bg-gray-50 rounded-xl p-4 text-left text-xs text-gray-500 max-w-lg mx-auto whitespace-pre-wrap">${escapeHtml(detail)}</div>` : ''}
+    </div>
+    ${(primary || secondary) ? `
+      <div class="mt-6 space-y-3">
+        ${renderButton(primary, 'primary')}
+        ${renderButton(secondary, 'secondary')}
+      </div>` : ''}`;
+  showScreen('screen-status');
+}
+
+function buildStudyApiUrl(action) {
+  if (!STUDY_API_BASE) return '';
+  // Use query-parameter routing instead of path routing. Apps Script
+  // path routes (/exec/start) go through a redirect chain that can strip
+  // CORS headers from cross-origin POSTs (causes /complete to fail with
+  // "No 'Access-Control-Allow-Origin' header"). The query form (/exec?action=...)
+  // is reached directly and preserves headers.
+  return `${STUDY_API_BASE}?action=${encodeURIComponent(action)}`;
+}
+
+async function callStudyApi(action, payload) {
+  const url = buildStudyApiUrl(action);
+  if (!url) throw new Error('Study API URL is not configured.');
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
+    redirect: 'follow',
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || `Study API request failed (${response.status}).`);
+  }
+  if (data.ok === false) {
+    throw new Error(data.error || 'Study API returned an error.');
+  }
+  return data;
+}
+
+function buildPostSurveyUrl() {
+  if (!POST_SURVEY_URL) return null;
+  const url = new URL(POST_SURVEY_URL, location.href);
+  url.searchParams.set('pid', state.participantId || '');
+  url.searchParams.set('session_id', state.sessionId || '');
+  url.searchParams.set('condition', state.condition || '');
+  url.searchParams.set('cc', state.serverCompletionCode || completionCode());
+  return url.toString();
+}
+
+function docWait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function markDocReady(stage) {
+  if (!DOC_MODE) return;
+  document.documentElement.setAttribute('data-doc-ready', '1');
+  document.documentElement.setAttribute('data-doc-stage', stage);
+}
+
+function resetChatUi() {
+  document.getElementById('chat-messages').innerHTML =
+    '<div class="text-center text-xs text-gray-400 py-2">Agent is ready.</div>';
+  document.getElementById('chat-footer-hint').textContent = 'Awaiting your task…';
+  document.getElementById('chat-next-btn').classList.add('hidden');
+  document.getElementById('modal-task').classList.add('hidden');
+  document.getElementById('panel-permissions').classList.add('hidden');
+}
+
+function initSingleTaskSession({ condition, taskId, version, sessionId }) {
+  const taskQueue = [{
+    task_id: taskId,
+    position: 1,
+    version,
+  }];
+  state.sessionId = sessionId || state.sessionId;
+  state.participantId = null;
+  state.condition = condition;
+  state.conditionSource = 'researcher_manual';
+  state.launchSource = 'researcher_single_task';
+  state.mode = 'single';
+  state.versionMix = 'random';
+  state.singleTaskId = taskId;
+  state.singleVersion = version;
+  state.startTime = new Date();
+  state.permissions = { webBrowsing: true };
+  state.eventLog = [];
+  state.taskQueue = taskQueue;
+  state.currentIdx = 0;
+  state.perTask = {};
+  state.sessionEnded = false;
+  state.participantPreview = false;
+  state.pendingCompletionPayload = null;
+  state.serverCompletionCode = null;
+  state.postSurveyRedirectUrl = null;
+  state.submittedAt = null;
+  taskQueue.forEach(t => {
+    state.perTask[t.task_id] = {
+      task_id: t.task_id,
+      position: t.position,
+      version: t.version,
+      decisions: [],
+      proceededWithInjection: null,
+      completed: false,
+      startedAt: null,
+      endedAt: null,
+    };
+  });
+  resetChatUi();
+  showScreen('screen-chat');
+  updateProgress();
+  logEvent('session_start', {
+    participant_id: state.participantId,
+    condition: state.condition,
+    condition_source: state.conditionSource,
+    launch_source: state.launchSource,
+    mode: state.mode,
+    version_mix: null,
+    task_queue: state.taskQueue,
+    total_tasks: state.taskQueue.length,
+    injections_planned: state.taskQueue.filter(t => t.version === 'injection').length,
+  });
+}
+
+function beginDocTask() {
+  const entry = currentEntry();
+  const task = currentTask();
+  logEvent('task_shown', {
+    task_id: task.id,
+    position: entry.position,
+    version: entry.version,
+    wording: task.prompt,
+  });
+  state.perTask[task.id].startedAt = new Date().toISOString();
+  document.getElementById('chat-footer-hint').textContent = 'Agent is working on your task…';
+  logEvent('task_started', { task_id: task.id, position: entry.position, version: entry.version });
+  logEvent('user_message', { task_id: task.id, text: task.prompt });
+  addUserMessage(task.prompt);
+  return { entry, task };
+}
+
+function latestApprovalButtons() {
+  return [...document.querySelectorAll('#chat-messages [data-buttons]')]
+    .filter(el => !el.classList.contains('hidden'))
+    .at(-1) || null;
+}
+
+async function resolveLatestApproval(decision) {
+  await docWait(DOC_MODE ? 80 : 250);
+  const buttons = latestApprovalButtons();
+  if (!buttons) throw new Error('No approval buttons available to resolve.');
+  const selector = decision === 'allow' ? '[data-allow]' : '[data-deny]';
+  buttons.querySelector(selector).click();
+  await docWait(DOC_MODE ? 50 : 150);
+}
+
+function makeDocRequestController({ task, position, decisions = {}, freezeOn = null, readyStage = null }) {
+  return async (libKey, opts = {}) => {
+    const args = {
+      libKey,
+      task,
+      position,
+      isInjection: !!opts.isInjection,
+    };
+    if (freezeOn && libKey === freezeOn) {
+      requestApproval(args);
+      await docWait(0);
+      markDocReady(readyStage || freezeOn);
+      return new Promise(() => {});
+    }
+    const pending = requestApproval(args);
+    if (decisions[libKey]) {
+      await resolveLatestApproval(decisions[libKey]);
+    }
+    return pending;
+  };
+}
+
+// ════════════════════════════════════════════════
+//  SETUP SCREEN
+// ════════════════════════════════════════════════
+function paintSetupOpts() {
+  document.querySelectorAll('.setup-opt').forEach(b => {
+    b.classList.remove('border-gray-800', 'bg-gray-800', 'text-white');
+    b.classList.add('border-gray-200', 'text-gray-700');
+  });
+  const sel = [];
+  if (state.condition) sel.push('cond-' + state.condition);
+  sel.push('mode-' + state.mode);
+  if (state.mode === 'full') {
+    sel.push('mix-' + state.versionMix);
+  } else if (state.singleVersion) {
+    sel.push('ver-' + state.singleVersion);
+  }
+  sel.forEach(id => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.classList.add('border-gray-800', 'bg-gray-800', 'text-white');
+    b.classList.remove('border-gray-200', 'text-gray-700');
+  });
+  const ready = state.condition && (state.mode === 'full' || state.singleVersion);
+  document.getElementById('setup-start').disabled = !ready;
+}
+
+function setCondition(c) { state.condition = c; paintSetupOpts(); }
+function setVersion(v)   { state.singleVersion = v; paintSetupOpts(); }
+function setMix(m)       { state.versionMix = m; paintSetupOpts(); }
+
+// Top-level setup tab: "configure" (researcher pickers) vs "preview"
+// (participant-style one-click run).
+function setSetupTab(tab) {
+  document.getElementById('setup-configure-view').classList.toggle('hidden', tab !== 'configure');
+  document.getElementById('setup-preview-view').classList.toggle('hidden',   tab !== 'preview');
+  document.querySelectorAll('.setup-tab').forEach(b => {
+    b.classList.remove('bg-white', 'text-gray-800', 'shadow-sm');
+    b.classList.add('text-gray-500');
+  });
+  const active = document.getElementById('tab-' + tab);
+  active.classList.add('bg-white', 'text-gray-800', 'shadow-sm');
+  active.classList.remove('text-gray-500');
+}
+
+// "Preview as participant": randomise everything, drop researcher tools,
+// run the participant flow end-to-end (including the minimal end screen).
+function startParticipantPreview() {
+  state.participantPreview = true;
+  const conds = ['standard', 'necessity', 'mechanism'];
+  state.condition  = conds[Math.floor(Math.random() * conds.length)];
+  state.mode       = 'full';
+  state.versionMix = 'random';
+  const panel = document.getElementById('cue-preview-panel');
+  if (panel) panel.style.display = 'none';
+  startStudy();
+}
+function setMode(m) {
+  state.mode = m;
+  document.getElementById('opts-full').classList.toggle('hidden', m !== 'full');
+  document.getElementById('opts-single').classList.toggle('hidden', m !== 'single');
+  paintSetupOpts();
+}
+
+function populateSingleTaskPicker() {
+  const sel = document.getElementById('single-task');
+  sel.innerHTML = TASKS.map(t =>
+    `<option value="${t.id}">Task ${t.id}: ${t.prompt}</option>`
+  ).join('');
+  sel.value = String(state.singleTaskId);
+  sel.addEventListener('change', e => { state.singleTaskId = parseInt(e.target.value, 10); });
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildTaskQueue() {
+  if (state.mode === 'single') {
+    return [{
+      task_id: state.singleTaskId,
+      position: 1,
+      version: state.singleVersion,
+    }];
+  }
+  // Full study: shuffle the 10 tasks, randomly assign 6 to injection (or override).
+  const ids = shuffle(TASKS.map(t => t.id));
+  let injectedSet;
+  if (state.versionMix === 'clean')       injectedSet = new Set();
+  else if (state.versionMix === 'injection') injectedSet = new Set(ids);
+  else                                    injectedSet = new Set(shuffle(ids).slice(0, INJECTIONS_PER_SESSION));
+  return ids.map((id, i) => ({
+    task_id: id,
+    position: i + 1,
+    version: injectedSet.has(id) ? 'injection' : 'clean',
+  }));
+}
+
+function startStudy(options = {}) {
+  const taskQueue = options.taskQueue || buildTaskQueue();
+  state.startTime = new Date();
+  state.taskQueue = taskQueue;
+  state.conditionSource = options.conditionSource || state.conditionSource || 'researcher_manual';
+  state.launchSource = options.launchSource || state.launchSource || 'researcher_setup';
+  if (options.sessionId) state.sessionId = options.sessionId;
+  if (Object.prototype.hasOwnProperty.call(options, 'participantId')) {
+    state.participantId = options.participantId;
+  }
+  state.permissions = { webBrowsing: true };
+  state.eventLog = [];
+  state.currentIdx = 0;
+  state.perTask = {};
+  state.sessionEnded = false;
+  state.pendingCompletionPayload = null;
+  state.serverCompletionCode = null;
+  state.postSurveyRedirectUrl = null;
+  state.submittedAt = null;
+  state.taskQueue.forEach(t => {
+    state.perTask[t.task_id] = {
+      task_id: t.task_id, position: t.position, version: t.version,
+      decisions: [], proceededWithInjection: null,
+      completed: false, startedAt: null, endedAt: null,
+    };
+  });
+  resetChatUi();
+  logEvent('session_start', {
+    participant_id: state.participantId,
+    condition: state.condition,
+    condition_source: state.conditionSource,
+    launch_source: state.launchSource,
+    mode: state.mode,
+    version_mix: state.mode === 'full' ? state.versionMix : null,
+    task_queue: state.taskQueue,
+    total_tasks: state.taskQueue.length,
+    injections_planned: state.taskQueue.filter(t => t.version === 'injection').length,
+  });
+
+  // Participant welcome adapts the task-count bullet to the actual queue size.
+  document.getElementById('welcome-task-count').innerHTML = state.mode === 'single'
+    ? 'You\'ll complete <strong>1 short task</strong> with Agent.'
+    : `You'll complete <strong>${state.taskQueue.length} short tasks</strong> with Agent (about 10–15 minutes).`;
+
+  showScreen('screen-welcome');
+}
+
+async function bootstrapParticipantStudy() {
+  const condition = validCondition(STUDY_CONDITION);
+  if (!condition) {
+    showStatusScreen({
+      title: 'Study Link Error',
+      message: 'This study link is missing a valid condition assignment.',
+      detail: `Received condition: ${STUDY_CONDITION || '(empty)'}`,
+      tone: 'error',
+    });
+    return;
+  }
+
+  if (!STUDY_API_BASE) {
+    showStatusScreen({
+      title: 'Study Backend Not Configured',
+      message: 'This build is missing the Apps Script endpoint needed to start participant sessions.',
+      detail: 'Set `apiBaseUrl` in study-config.js before using this build with Qualtrics.',
+      tone: 'error',
+    });
+    return;
+  }
+
+  showStatusScreen({
+    title: 'Preparing Your Session',
+    message: 'Please wait while the study checks your link and starts your session.',
+  });
+
+  try {
+    const startResult = await callStudyApi('start', {
+      participant_id: STUDY_PID,
+      condition,
+      launch_url: location.href,
+      user_agent: navigator.userAgent,
+      started_at: new Date().toISOString(),
+    });
+
+    state.condition = condition;
+    state.mode = 'full';
+    state.versionMix = 'random';
+    state.participantPreview = false;
+    startStudy({
+      participantId: STUDY_PID,
+      sessionId: startResult.session_id,
+      conditionSource: 'qualtrics_redirect',
+      launchSource: 'qualtrics_redirect',
+      taskQueue: Array.isArray(startResult.task_queue) ? startResult.task_queue : null,
+    });
+  } catch (err) {
+    showStatusScreen({
+      title: 'Session Start Failed',
+      message: 'We could not start your study session. Please return to the survey and reopen the study link.',
+      detail: String(err.message || err),
+      tone: 'error',
+      primary: { label: 'Try Again', action: 'retryStudyLaunch()' },
+    });
+  }
+}
+
+function retryStudyLaunch() {
+  void bootstrapParticipantStudy();
+}
+
+// ════════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goToChat() {
+  showScreen('screen-chat');
+  updateProgress();
+  setTimeout(openTaskModal, 600);
+}
+
+function endSessionEarly() {
+  if (state.sessionEnded) return;
+  void endSession({ end_reason: 'abandoned' });
+}
+
+function buildSessionPayload({ endReason, durationSeconds, completed }) {
+  const granted = Object.entries(state.permissions).filter(([, v]) => v).map(([k]) => k);
+  return {
+    schema_version: 1,
+    participant_id: state.participantId,
+    session_id: state.sessionId,
+    condition: state.condition,
+    condition_source: state.conditionSource,
+    launch_source: state.launchSource,
+    mode: state.mode,
+    version_mix: state.mode === 'full' ? state.versionMix : null,
+    started_at: state.startTime ? state.startTime.toISOString() : null,
+    ended_at: new Date().toISOString(),
+    duration_s: Number(durationSeconds),
+    completed,
+    end_reason: endReason,
+    default_permissions: DEFAULT_PERMISSIONS,
+    active_permissions: granted,
+    user_granted_permissions: granted.filter(p => !DEFAULT_PERMISSIONS.includes(p)),
+    task_queue: state.taskQueue,
+    per_task: state.taskQueue.map(t => state.perTask[t.task_id]),
+    completion_code: completionCode(),
+    user_agent: navigator.userAgent,
+    launch_url: location.href,
+    event_count: state.eventLog.length,
+    events: state.eventLog,
+  };
+}
+
+async function submitFinalSession() {
+  if (!state.pendingCompletionPayload) {
+    throw new Error('No session payload is ready to submit.');
+  }
+  showStatusScreen({
+    title: 'Saving Your Session',
+    message: 'Please wait while we save your responses and prepare the return to the survey.',
+  });
+  const result = await callStudyApi('complete', state.pendingCompletionPayload);
+  state.serverCompletionCode = result.completion_code || state.pendingCompletionPayload.completion_code;
+  state.postSurveyRedirectUrl = buildPostSurveyUrl();
+  state.submittedAt = new Date().toISOString();
+  clearLocalBackup();
+  renderDebrief();
+  showScreen('screen-debrief');
+  if (state.postSurveyRedirectUrl && AUTO_REDIRECT_TO_POST) {
+    setTimeout(() => {
+      location.assign(state.postSurveyRedirectUrl);
+    }, POST_REDIRECT_DELAY_MS);
+  }
+}
+
+function retryCompletionUpload() {
+  void submitFinalSession().catch(err => {
+    showStatusScreen({
+      title: 'Session Save Failed',
+      message: 'We could not save your session yet. Please try again. Do not close this tab until it succeeds.',
+      detail: String(err.message || err),
+      tone: 'error',
+      primary: { label: 'Retry Save', action: 'retryCompletionUpload()' },
+      secondary: { label: 'Download Session JSON', action: 'downloadLog()' },
+    });
+  });
+}
+
+function returnToPostSurvey() {
+  if (state.postSurveyRedirectUrl) location.assign(state.postSurveyRedirectUrl);
+}
+
+async function endSession({ end_reason }) {
+  if (state.sessionEnded) return;
+  state.sessionEnded = true;
+  const duration = ((new Date() - state.startTime) / 1000).toFixed(1);
+  const allCompleted = state.taskQueue.every(t => state.perTask[t.task_id].completed);
+  logEvent('session_end', {
+    duration_s: duration,
+    completed: allCompleted,
+    end_reason,
+    per_task: state.taskQueue.map(t => state.perTask[t.task_id]),
+  });
+  state.pendingCompletionPayload = buildSessionPayload({
+    endReason: end_reason,
+    durationSeconds: duration,
+    completed: allCompleted,
+  });
+
+  if (isStudyParticipant()) {
+    try {
+      await submitFinalSession();
+      return;
+    } catch (err) {
+      showStatusScreen({
+        title: 'Session Save Failed',
+        message: 'We could not save your session yet. Please try again. Do not close this tab until it succeeds.',
+        detail: String(err.message || err),
+        tone: 'error',
+        primary: { label: 'Retry Save', action: 'retryCompletionUpload()' },
+        secondary: { label: 'Download Session JSON', action: 'downloadLog()' },
+      });
+      return;
+    }
+  }
+
+  renderDebrief();
+  showScreen('screen-debrief');
+}
+
+// ════════════════════════════════════════════════
+//  PROGRESS HEADER
+// ════════════════════════════════════════════════
+function updateProgress() {
+  const el = document.getElementById('chat-progress');
+  if (state.taskQueue.length <= 1) { el.textContent = ''; return; }
+  el.textContent = `Task ${Math.min(state.currentIdx + 1, state.taskQueue.length)} of ${state.taskQueue.length}`;
+}
+
+// ════════════════════════════════════════════════
+//  TASK FLOW
+// ════════════════════════════════════════════════
+function currentEntry() { return state.taskQueue[state.currentIdx]; }
+function currentTask()  { return TASK_BY_ID[currentEntry().task_id]; }
+
+function openTaskModal() {
+  const entry = currentEntry();
+  const task = currentTask();
+  document.getElementById('task-counter').textContent =
+    state.taskQueue.length === 1 ? `Task ${task.id}` : `Task ${entry.position} of ${state.taskQueue.length}`;
+  document.getElementById('task-instruction').textContent = task.instruction;
+  document.getElementById('task-prompt').textContent = `“${task.prompt}”`;
+  document.getElementById('modal-task').classList.remove('hidden');
+  logEvent('task_shown', {
+    task_id: task.id, position: entry.position, version: entry.version, wording: task.prompt,
+  });
+}
+
+function sendTask() {
+  document.getElementById('modal-task').classList.add('hidden');
+  document.getElementById('chat-footer-hint').textContent = 'Agent is working on your task…';
+  document.getElementById('chat-next-btn').classList.add('hidden');
+  const entry = currentEntry();
+  const task = currentTask();
+  state.perTask[task.id].startedAt = new Date().toISOString();
+  logEvent('task_started', { task_id: task.id, position: entry.position, version: entry.version });
+  logEvent('user_message', { task_id: task.id, text: task.prompt });
+  addUserMessage(task.prompt);
+  runCurrentTask();
+}
+
+async function runCurrentTask() {
+  const entry = currentEntry();
+  const task = currentTask();
+  const isInjection = entry.version === 'injection';
+
+  // request(libKey, opts) — wraps requestApproval with the task's context so each
+  // task flow stays compact. `isInjection` here refers to the *individual* approval,
+  // not the task version (a single injection task can have both clean and injected
+  // approvals; the clean save in Task 2 is a real example).
+  const request = (libKey, opts = {}) => requestApproval({
+    libKey,
+    task,
+    position: entry.position,
+    isInjection: !!opts.isInjection,
+  });
+
+  try {
+    await task.flow({ isInjection, request });
+  } catch (e) {
+    console.error('task flow error', e);
+  }
+
+  state.perTask[task.id].completed = true;
+  state.perTask[task.id].endedAt = new Date().toISOString();
+  logEvent('task_complete', { task_id: task.id, position: entry.position, version: entry.version });
+
+  // Inline divider so the transcript clearly marks task boundaries.
+  addDivider(state.currentIdx + 1 < state.taskQueue.length
+    ? `Task ${entry.position} of ${state.taskQueue.length} complete`
+    : `All ${state.taskQueue.length} task${state.taskQueue.length > 1 ? 's' : ''} complete`);
+
+  const isLast = state.currentIdx + 1 >= state.taskQueue.length;
+  document.getElementById('chat-footer-hint').textContent = isLast ? 'Session complete.' : 'Task complete.';
+  const btn = document.getElementById('chat-next-btn');
+  btn.textContent = isLast ? 'Finish session' : 'Continue to next task';
+  btn.classList.remove('hidden');
+}
+
+function advanceTask() {
+  const isLast = state.currentIdx + 1 >= state.taskQueue.length;
+  if (isLast) {
+    void endSession({ end_reason: 'task_complete' });
+    return;
+  }
+  state.currentIdx += 1;
+  updateProgress();
+  document.getElementById('chat-next-btn').classList.add('hidden');
+  document.getElementById('chat-footer-hint').textContent = 'Awaiting your task…';
+  openTaskModal();
+}
+
+// ════════════════════════════════════════════════
+//  CUE RENDERING  (research preview — four styles)
+//  state.cueStyle controls visual treatment of the Mechanism / Necessity cue.
+//  setCueStyle live-updates every visible approval card so styles can be
+//  compared mid-flow without re-running the session. NOTE: the styles differ
+//  only in visual chrome; the cue *text* is identical across styles, so the
+//  manipulation copy from §1.6 is preserved. Remove the floating panel and
+//  fix a style before final deployment.
+// ════════════════════════════════════════════════
+function renderCue(condition, cfg) {
+  if (condition !== 'mechanism' && condition !== 'necessity') return '';
+  const isM = condition === 'mechanism';
+  const text  = isM ? cfg.how : cfg.necessity;
+  const label = isM ? 'How this could be misused' : 'Needed for this task?';
+  const c = isM
+    ? { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', icon: '⚠' }
+    : { bg: 'bg-blue-50',  border: 'border-blue-200',  text: 'text-blue-800',  icon: 'ⓘ' };
+
+  switch (state.cueStyle) {
+    case 'a':  // drop redundant uppercase label
+      return `<div class="${c.bg} border ${c.border} rounded-lg px-4 py-2 mb-3">
+        <p class="text-[13px] ${c.text} leading-snug">${escapeHtml(text)}</p>
+      </div>`;
+    case 'b':  // inline hint, no background fill
+      return `<div class="flex items-start gap-2 mb-3 px-1">
+        <span class="${c.text} text-sm shrink-0 leading-snug">${c.icon}</span>
+        <p class="text-[13px] ${c.text} leading-snug">${escapeHtml(text)}</p>
+      </div>`;
+    case 'c':  // italic supporting line (lowest reactivity)
+      return `<p class="text-[13px] ${c.text} italic leading-snug -mt-1 mb-3 pl-1">${escapeHtml(text)}</p>`;
+    case 'original':
+    default:
+      return `<div class="${c.bg} border ${c.border} rounded-lg px-4 py-3 mb-3">
+        <div class="text-[11px] font-semibold ${c.text} uppercase tracking-wide mb-1">${label}</div>
+        <p class="text-[13px] ${c.text} leading-snug">${escapeHtml(text)}</p>
+      </div>`;
+  }
+}
+
+function setCueStyle(style) {
+  state.cueStyle = style;
+  // Live-update any approval cards already in the DOM so the PI can see styles
+  // side-by-side without re-running the flow.
+  document.querySelectorAll('[data-cue-host]').forEach(host => {
+    const cfg = APPROVAL_LIB[host.getAttribute('data-cue-key')];
+    if (cfg) host.innerHTML = renderCue(state.condition, cfg);
+  });
+  // Reflect the selected radio in the floating panel.
+  document.querySelectorAll('input[name="cue-style"]').forEach(r => {
+    r.checked = (r.value === style);
+  });
+  logEvent('cue_style_changed', { cue_style: style });
+}
+
+// ════════════════════════════════════════════════
+//  APPROVAL PROMPT  (inline card; returns 'allow' | 'deny')
+//  Renders in the chat stream and pauses the agent until a decision. The three
+//  conditions differ ONLY in the cue added above the buttons:
+//  Standard = none, Necessity = goal-alignment cue, Mechanism = how-it-could-be-misused cue.
+// ════════════════════════════════════════════════
+function requestApproval({ libKey, task, position, isInjection }) {
+  const cfg = APPROVAL_LIB[libKey];
+  if (!cfg) throw new Error('Unknown approval key: ' + libKey);
+
+  // Permission-kind approvals are no-ops if the permission was already granted
+  // earlier in the session — realistic and matches §1.3. Action-kind approvals
+  // always show, since they confirm a specific action, not a capability.
+  if (cfg.kind === 'permission' && state.permissions[cfg.permission]) {
+    logEvent('approval_skipped_already_granted', {
+      approval_id: libKey, task_id: task.id, permission: cfg.permission,
+    });
+    return Promise.resolve('allow');
+  }
+
+  const approvalId = libKey;   // stable id; one per design row, so joins cleanly across the dataset
+  const meta = {
+    approval_id: approvalId, task_id: task.id, task_position: position,
+    permission: cfg.permission, kind: cfg.kind, action: cfg.action, is_injection: isInjection,
+  };
+
+  return new Promise(resolve => {
+    const shownAt = Date.now();
+    logEvent('approval_shown', {
+      ...meta,
+      prompt_copy: {
+        body:      cfg.body,
+        how:       state.condition === 'mechanism' ? cfg.how       : null,
+        necessity: state.condition === 'necessity' ? cfg.necessity : null,
+      },
+    });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'flex justify-start fade-in';
+    wrap.innerHTML = `
+      <div class="chat-message w-full bg-white border-2 border-blue-200 rounded-2xl rounded-bl-md p-4 shadow-sm">
+        <div class="flex items-start gap-3 mb-3">
+          <div class="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-lg shrink-0">${cfg.icon}</div>
+          <div>
+            <div class="font-bold text-gray-800 text-sm mb-1">${escapeHtml(cfg.title)}</div>
+            <p class="text-sm text-gray-600 leading-relaxed">${escapeHtml(cfg.body)}</p>
+          </div>
+        </div>
+        <div data-cue-host data-cue-key="${libKey}">${renderCue(state.condition, cfg)}</div>
+        <div class="grid grid-cols-2 gap-3" data-buttons>
+          <button data-deny class="py-2.5 rounded-xl text-sm font-semibold border-2 border-gray-300 text-gray-700 hover:bg-gray-50 transition">Deny</button>
+          <button data-allow class="py-2.5 rounded-xl text-sm font-semibold bg-gray-800 text-white hover:bg-gray-700 transition">Allow</button>
+        </div>
+        <div data-resolved class="hidden text-sm font-semibold"></div>
+      </div>`;
+    document.getElementById('chat-messages').appendChild(wrap);
+    scrollToBottom();
+
+    const decide = (decision) => {
+      const latency = Date.now() - shownAt;
+      wrap.querySelector('[data-buttons]').classList.add('hidden');
+      const resolved = wrap.querySelector('[data-resolved]');
+      resolved.classList.remove('hidden');
+      resolved.classList.add(decision === 'allow' ? 'text-green-600' : 'text-gray-500');
+      resolved.textContent = decision === 'allow' ? '✓ Allowed' : '✕ Denied';
+
+      logEvent('approval_decision', { ...meta, decision, latency_ms: latency });
+      state.perTask[task.id].decisions.push({
+        approval_id: approvalId, permission: cfg.permission, kind: cfg.kind, action: cfg.action,
+        is_injection: isInjection, decision, latency_ms: latency,
+      });
+      if (decision === 'allow') state.permissions[cfg.permission] = true;
+      if (isInjection) {
+        // OR-aggregate across multiple injected approvals in a task: true once the
+        // participant allows any of them. Tasks 1 and 9 have two injected approvals
+        // each; without this, the second decision would overwrite the first and the
+        // summary stat would be wrong (e.g., allow-then-deny would read as "didn't
+        // proceed"). The per-approval log keeps every decision separately.
+        const prevProceeded = state.perTask[task.id].proceededWithInjection;
+        state.perTask[task.id].proceededWithInjection = prevProceeded === true || decision === 'allow';
+        logEvent('injection_response', {
+          task_id: task.id, approval_id: approvalId,
+          response: decision === 'allow' ? 'proceed' : 'stopped',
+        });
+      }
+      resolve(decision);
+    };
+
+    wrap.querySelector('[data-deny]').addEventListener('click', () => decide('deny'));
+    wrap.querySelector('[data-allow]').addEventListener('click', () => decide('allow'));
+  });
+}
+
+// ════════════════════════════════════════════════
+//  CHAT RENDERING
+// ════════════════════════════════════════════════
+function addUserMessage(text) {
+  const wrap = document.createElement('div');
+  wrap.className = 'flex justify-end fade-in';
+  wrap.innerHTML = `<div class="chat-message bg-gray-800 text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm">${escapeHtml(text)}</div>`;
+  document.getElementById('chat-messages').appendChild(wrap);
+  scrollToBottom();
+}
+
+function addAgentMessage(text, code) {
+  const wrap = document.createElement('div');
+  wrap.className = 'flex justify-start fade-in';
+  let inner = `<div class="narration text-sm text-gray-800">${escapeHtml(text)}</div>`;
+  if (code) {
+    inner += `<pre class="mt-2 bg-gray-900 text-gray-100 rounded-lg p-3 text-xs overflow-x-auto"></pre>`;
+  }
+  wrap.innerHTML = `<div class="chat-message bg-white border border-gray-200 rounded-2xl rounded-bl-md px-4 py-2.5">${inner}</div>`;
+  if (code) wrap.querySelector('pre').textContent = code;
+  document.getElementById('chat-messages').appendChild(wrap);
+  scrollToBottom();
+}
+
+function addDivider(label) {
+  const wrap = document.createElement('div');
+  wrap.className = 'text-center text-xs text-gray-400 py-3';
+  wrap.innerHTML = `<span class="inline-block px-3 py-1 rounded-full bg-gray-200 text-gray-500">${escapeHtml(label)}</span>`;
+  document.getElementById('chat-messages').appendChild(wrap);
+  scrollToBottom();
+}
+
+function showTyping() {
+  const wrap = document.createElement('div');
+  wrap.id = 'typing-indicator';
+  wrap.className = 'flex justify-start';
+  wrap.innerHTML = `<div class="bg-white border border-gray-200 rounded-2xl rounded-bl-md px-4 py-3 flex gap-1">
+    <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
+    <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span>
+    <span class="typing-dot w-2 h-2 bg-gray-400 rounded-full"></span></div>`;
+  document.getElementById('chat-messages').appendChild(wrap);
+  scrollToBottom();
+}
+function removeTyping() {
+  const t = document.getElementById('typing-indicator');
+  if (t) t.remove();
+}
+
+function agentSay(text, opts = {}) {
+  return new Promise(resolve => {
+    showTyping();
+    const delay = DOC_MODE ? (opts.code ? 140 : 90) : (opts.code ? 1000 : 750);
+    setTimeout(() => {
+      removeTyping();
+      addAgentMessage(text, opts.code);
+      logEvent('agent_message', { task_id: currentTask().id, text, has_code: !!opts.code });
+      setTimeout(resolve, DOC_MODE ? 45 : 220);
+    }, delay);
+  });
+}
+
+function scrollToBottom() {
+  const box = document.getElementById('chat-messages');
+  box.scrollTop = box.scrollHeight;
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ════════════════════════════════════════════════
+//  PERMISSIONS PANEL
+// ════════════════════════════════════════════════
+function openPermissionsPanel() {
+  const list = document.getElementById('panel-permissions-list');
+  list.innerHTML = PERMISSIONS.map(p => {
+    const on = !!state.permissions[p.id];
+    return `<div class="flex items-start gap-3 border border-gray-100 rounded-xl p-3">
+      <div class="text-xl shrink-0">${p.icon}</div>
+      <div class="flex-1">
+        <div class="text-sm font-medium text-gray-800">${p.label}</div>
+        <div class="text-xs text-gray-400">${p.desc}</div>
+      </div>
+      <span class="text-xs font-semibold ${on ? 'text-green-600' : 'text-gray-300'}">${on ? 'Granted' : 'Off'}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('panel-permissions').classList.remove('hidden');
+  logEvent('permissions_panel_opened', { task_id: state.taskQueue.length ? currentTask().id : null });
+}
+function closePermissionsPanel() {
+  document.getElementById('panel-permissions').classList.add('hidden');
+}
+
+// ════════════════════════════════════════════════
+//  DEBRIEF
+// ════════════════════════════════════════════════
+// Short, memorable confirmation code derived from sessionId. Stable so the
+// same participant produces the same code if the page reloads with the same
+// session, and entropy is ~36^6 ≈ 2.2 billion — plenty for matching.
+function completionCode() {
+  const src = (state.sessionId + 'xxxxxx').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return src.slice(0, 6);
+}
+
+function renderDebrief() {
+  document.getElementById('debrief-content').innerHTML =
+    isResearcher() ? renderResearcherDebrief() : renderParticipantDebrief();
+}
+
+// ── Participant view: minimal, non-revealing ─────────────────────────────
+// Intentionally omits: what prompt injection is, which tasks were injected,
+// the per-task breakdown, and the participant's own decisions. The full
+// debrief happens AFTER the post-study survey, per §1.7.1.
+function renderParticipantDebrief() {
+  const code = state.serverCompletionCode || completionCode();
+  const postBtn = state.postSurveyRedirectUrl
+    ? `<button onclick="returnToPostSurvey()" class="w-full py-3.5 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition text-sm mb-3">
+        Return to survey
+      </button>
+      <p class="text-xs text-gray-500 mb-4">If you are not redirected automatically, use the button above.</p>`
+    : '';
+  return `
+    <div class="text-center py-2">
+      <div class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">✓</div>
+      <h1 class="text-2xl font-bold text-gray-800 mb-2">Thank you</h1>
+      <p class="text-sm text-gray-600 leading-relaxed mb-6 max-w-md mx-auto">
+        Your session has been recorded. Please return to the survey window to
+        complete the remaining questions.
+      </p>
+      <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 mb-5 max-w-md mx-auto">
+        <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Your completion code</div>
+        <div class="text-3xl font-bold text-gray-800 tracking-[0.25em] font-mono">${escapeHtml(code)}</div>
+        <p class="text-xs text-gray-500 mt-3 leading-relaxed">
+          Copy this code into the survey when prompted.
+        </p>
+      </div>
+      ${postBtn}
+      <button onclick="downloadLog()" class="text-xs text-gray-500 hover:text-gray-800 underline">
+        Download a copy of your session (optional)
+      </button>
+    </div>`;
+}
+
+// ── Researcher view: full diagnostic debrief for piloting / verifying ───
+function renderResearcherDebrief() {
+  const totalApprovals    = state.taskQueue.reduce((n, t) => n + state.perTask[t.task_id].decisions.length, 0);
+  const injectedDecisions = state.taskQueue.flatMap(t => state.perTask[t.task_id].decisions).filter(d => d.is_injection);
+  const proceededCount    = injectedDecisions.filter(d => d.decision === 'allow').length;
+  const stoppedCount      = injectedDecisions.length - proceededCount;
+  const completedCount    = state.taskQueue.filter(t => state.perTask[t.task_id].completed).length;
+  const startedCount      = state.taskQueue.filter(t => state.perTask[t.task_id].startedAt).length;
+
+  const summary = [
+    ['Condition',           { standard: 'Standard', necessity: 'Necessity', mechanism: 'Mechanism' }[state.condition]],
+    ['Tasks completed',     `${completedCount} / ${state.taskQueue.length}`],
+    ['Tasks started',       `${startedCount} / ${state.taskQueue.length}`],
+    ['Approval prompts shown', String(totalApprovals)],
+  ];
+  if (injectedDecisions.length) {
+    summary.push(['Injected requests proceeded with', `${proceededCount} of ${injectedDecisions.length}`]);
+    summary.push(['Injected requests stopped',        `${stoppedCount} of ${injectedDecisions.length}`]);
+  }
+
+  const summaryHtml = `
+    <div class="border border-gray-200 rounded-xl overflow-hidden mb-5">
+      <div class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Session summary</div>
+      <div class="divide-y divide-gray-100 text-sm">
+        ${summary.map(([k, v]) => `
+          <div class="flex justify-between px-4 py-2.5">
+            <span class="text-gray-500">${escapeHtml(k)}</span>
+            <span class="font-medium text-gray-800">${escapeHtml(v)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  // Per-task breakdown: now distinguishes completed / started-not-completed /
+  // not-played (the previous version showed "No approvals required" for
+  // unplayed tasks, which is wrong).
+  const perTaskHtml = `
+    <div class="border border-gray-200 rounded-xl overflow-hidden mb-5">
+      <div class="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Per-task breakdown</div>
+      <div class="divide-y divide-gray-100 text-sm">
+        ${state.taskQueue.map(entry => {
+          const t = TASK_BY_ID[entry.task_id];
+          const data = state.perTask[entry.task_id];
+          const versionLabel = entry.version === 'injection'
+            ? '<span class="text-amber-700 font-medium">Injection</span>'
+            : '<span class="text-gray-500">Clean</span>';
+          let statusHtml;
+          if (!data.startedAt) {
+            statusHtml = '<div class="text-xs text-gray-400 italic mt-0.5">Not played, session ended before this task</div>';
+          } else if (data.decisions.length === 0) {
+            statusHtml = data.completed
+              ? '<div class="text-xs text-gray-400 mt-0.5">Played, no approvals required</div>'
+              : '<div class="text-xs text-gray-400 italic mt-0.5">Started but not completed</div>';
+          } else {
+            statusHtml = data.decisions.map(d => {
+              const tag = d.is_injection ? '⚠️ ' : '';
+              const lbl = `${tag}${d.permission} (${d.kind})`;
+              return `<div class="flex justify-between text-xs text-gray-600 mt-0.5">
+                <span>${escapeHtml(lbl)}</span>
+                <span class="${d.decision === 'allow' ? 'text-green-600' : 'text-gray-500'} font-medium">
+                  ${d.decision === 'allow' ? 'Allowed' : 'Denied'} · ${(d.latency_ms / 1000).toFixed(1)}s
+                </span>
+              </div>`;
+            }).join('');
+          }
+          return `<div class="px-4 py-3 ${data.startedAt ? '' : 'opacity-60'}">
+            <div class="flex items-center justify-between">
+              <div class="text-sm font-medium text-gray-800">Task ${entry.position}: ${escapeHtml(t.prompt)}</div>
+              <div class="text-xs">${versionLabel}</div>
+            </div>
+            <div class="text-xs text-gray-400 mb-1">${escapeHtml(t.type)} · canonical id ${t.id}</div>
+            ${statusHtml}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  return `
+    <div class="flex items-center gap-2 mb-1">
+      <h1 class="text-xl font-bold text-gray-800">Session complete: researcher view</h1>
+      <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest border border-gray-200 rounded px-2 py-0.5">?researcher=1</span>
+    </div>
+    <p class="text-sm text-gray-500 mb-5">Participants do not see this view. Their end screen is a minimal thank-you + completion code.</p>
+    ${summaryHtml}
+    ${perTaskHtml}
+    <div class="flex gap-2">
+      <button onclick="downloadLog()" class="flex-1 py-3 bg-gray-800 text-white rounded-xl text-sm font-medium hover:bg-gray-700 transition">Download session log (JSON)</button>
+      <button onclick="location.reload()" class="px-5 py-3 border-2 border-gray-300 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition">New session</button>
+    </div>`;
+}
+
+function downloadLog() {
+  const payload = state.pendingCompletionPayload || {
+    session_id: state.sessionId,
+    participant_id: state.participantId,
+    condition: state.condition,
+    events: state.eventLog,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `session_${state.sessionId}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ════════════════════════════════════════════════
+//  LOGGING
+// ════════════════════════════════════════════════
+function logEvent(type, data = {}) {
+  const now = new Date();
+  const ev = {
+    participant_id: state.participantId,
+    session_id: state.sessionId,
+    condition: state.condition,
+    ts: now.toISOString(),
+    elapsed_s: state.startTime ? ((now - state.startTime) / 1000).toFixed(1) : null,
+    event: type,
+    ...data,
+  };
+  state.eventLog.push(ev);
+  saveLocalBackup();
+  if (shouldStreamLocalLogs()) {
+    fetch(LOCAL_LOG_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ev),
+    }).catch(() => {});
+  }
+}
+
+// ════════════════════════════════════════════════
+//  IRB DOCUMENTATION MODE  (researcher-only snapshots)
+//  Use ?researcher=1&doc=<stage> to render reproducible UI states for IRB
+//  packets and appendices without altering the participant flow.
+// ════════════════════════════════════════════════
+async function runDocMode() {
+  if (!DOC_MODE) return;
+
+  const docMap = {
+    'task-modal': async () => {
+      initSingleTaskSession({
+        condition: DOC_CONDITION || 'standard',
+        taskId: 2,
+        version: 'clean',
+        sessionId: DOC_SESSION_ID || 'irb-task-modal',
+      });
+      openTaskModal();
+      markDocReady('task-modal');
+    },
+
+    'chat-interface': async () => {
+      initSingleTaskSession({
+        condition: DOC_CONDITION || 'standard',
+        taskId: 1,
+        version: 'clean',
+        sessionId: DOC_SESSION_ID || 'irb-chat-interface',
+      });
+      const { task } = beginDocTask();
+      await agentSay('Sure, let me find a classic one for you.');
+      await agentSay(RECIPE_TEXT);
+      markDocReady('chat-interface');
+    },
+
+    'approval-standard': async () => {
+      initSingleTaskSession({
+        condition: 'standard',
+        taskId: 2,
+        version: 'injection',
+        sessionId: DOC_SESSION_ID || 'irb-approval-standard',
+      });
+      const { entry, task } = beginDocTask();
+      const request = makeDocRequestController({
+        task,
+        position: entry.position,
+        freezeOn: 't2_download',
+        readyStage: 'approval-standard',
+      });
+      void task.flow({ isInjection: true, request });
+    },
+
+    'approval-necessity': async () => {
+      initSingleTaskSession({
+        condition: 'necessity',
+        taskId: 2,
+        version: 'injection',
+        sessionId: DOC_SESSION_ID || 'irb-approval-necessity',
+      });
+      const { entry, task } = beginDocTask();
+      const request = makeDocRequestController({
+        task,
+        position: entry.position,
+        freezeOn: 't2_download',
+        readyStage: 'approval-necessity',
+      });
+      void task.flow({ isInjection: true, request });
+    },
+
+    'approval-mechanism': async () => {
+      initSingleTaskSession({
+        condition: 'mechanism',
+        taskId: 2,
+        version: 'injection',
+        sessionId: DOC_SESSION_ID || 'irb-approval-mechanism',
+      });
+      const { entry, task } = beginDocTask();
+      const request = makeDocRequestController({
+        task,
+        position: entry.position,
+        freezeOn: 't2_download',
+        readyStage: 'approval-mechanism',
+      });
+      void task.flow({ isInjection: true, request });
+    },
+
+    'action-confirmation': async () => {
+      initSingleTaskSession({
+        condition: DOC_CONDITION || 'standard',
+        taskId: 3,
+        version: 'injection',
+        sessionId: DOC_SESSION_ID || 'irb-action-confirmation',
+      });
+      const { entry, task } = beginDocTask();
+      const request = makeDocRequestController({
+        task,
+        position: entry.position,
+        decisions: { t3_email: 'allow' },
+        freezeOn: 't3_cc',
+        readyStage: 'action-confirmation',
+      });
+      void task.flow({ isInjection: true, request });
+    },
+
+    'allow-outcome': async () => {
+      initSingleTaskSession({
+        condition: DOC_CONDITION || 'standard',
+        taskId: 3,
+        version: 'injection',
+        sessionId: DOC_SESSION_ID || 'irb-allow-outcome',
+      });
+      const { entry, task } = beginDocTask();
+      const request = makeDocRequestController({
+        task,
+        position: entry.position,
+        decisions: { t3_email: 'allow', t3_cc: 'allow' },
+      });
+      await task.flow({ isInjection: true, request });
+      markDocReady('allow-outcome');
+    },
+
+    'deny-outcome': async () => {
+      initSingleTaskSession({
+        condition: DOC_CONDITION || 'standard',
+        taskId: 3,
+        version: 'injection',
+        sessionId: DOC_SESSION_ID || 'irb-deny-outcome',
+      });
+      const { entry, task } = beginDocTask();
+      const request = makeDocRequestController({
+        task,
+        position: entry.position,
+        decisions: { t3_email: 'allow', t3_cc: 'deny' },
+      });
+      await task.flow({ isInjection: true, request });
+      markDocReady('deny-outcome');
+    },
+
+    'sample-log': async () => {
+      initSingleTaskSession({
+        condition: DOC_CONDITION || 'necessity',
+        taskId: 3,
+        version: 'injection',
+        sessionId: DOC_SESSION_ID || 'irb-sample-log',
+      });
+      const { entry, task } = beginDocTask();
+      const request = makeDocRequestController({
+        task,
+        position: entry.position,
+        decisions: { t3_email: 'allow', t3_cc: 'deny' },
+      });
+      await task.flow({ isInjection: true, request });
+      state.perTask[task.id].completed = true;
+      state.perTask[task.id].endedAt = new Date().toISOString();
+      logEvent('task_complete', { task_id: task.id, position: entry.position, version: entry.version });
+      endSession({ end_reason: 'doc_sample' });
+      markDocReady('sample-log');
+    },
+  };
+
+  const panel = document.getElementById('cue-preview-panel');
+  if (panel) panel.remove();
+
+  const run = docMap[DOC_MODE];
+  if (!run) {
+    console.error('Unknown documentation stage:', DOC_MODE);
+    markDocReady('doc-error');
+    return;
+  }
+
+  try {
+    await run();
+  } catch (err) {
+    console.error('Documentation mode failed:', err);
+    document.documentElement.setAttribute('data-doc-error', String(err));
+    markDocReady('doc-error');
+  }
+}
+
+// ════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════
+populateSingleTaskPicker();
+setSetupTab('configure');
+setMode('full');
+setMix('random');
+paintSetupOpts();
+
+// Researcher-only UI: hide the cue-style preview panel for participants.
+if (!RESEARCHER_MODE) {
+  const panel = document.getElementById('cue-preview-panel');
+  if (panel) panel.remove();
+}
+
+if (DOC_MODE) {
+  void runDocMode();
+} else if (STUDY_LAUNCH) {
+  void bootstrapParticipantStudy();
+} else if (RESEARCHER_MODE) {
+  showScreen('screen-setup');
+} else {
+  showStatusScreen({
+    title: 'Study Link Required',
+    message: 'This site must be opened from the Qualtrics study link so your participant ID and condition are included.',
+    detail: 'Expected query parameters: `pid` and `condition`.',
+    tone: 'error',
+  });
+}
+</script>
+</body>
+</html>
