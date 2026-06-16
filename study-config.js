@@ -5,7 +5,7 @@ window.__STUDY_CONFIG__ = {
 
   // Qualtrics post-survey URL.
   // Example: "https://example.qualtrics.com/jfe/form/SV_postsurvey"
-  postSurveyUrl: "",
+  postSurveyUrl: "https://pennstate.qualtrics.com/jfe/form/SV_enyee22zUNQotlY",
 
   // Participant flow returns to the post-survey automatically after a save.
   autoRedirectToPostSurvey: true,
