@@ -1836,30 +1836,37 @@ function renderDebrief() {
 // debrief happens AFTER the post-study survey, per §1.7.1.
 function renderParticipantDebrief() {
   const code = state.serverCompletionCode || completionCode();
-  const postBtn = state.postSurveyRedirectUrl
-    ? `<button onclick="returnToPostSurvey()" class="w-full py-3.5 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition text-sm mb-3">
-        Return to survey
+  const hasRedirect = !!state.postSurveyRedirectUrl;
+
+  // Two modes:
+  // (a) post-survey URL is configured → "returning you to the survey…" + auto-redirect (fires from
+  //     elsewhere via location.assign on a setTimeout). Manual button is a fallback if redirect stalls.
+  // (b) no post-survey URL configured → standalone thank-you. Useful during piloting before Qualtrics
+  //     is wired up. Completion code is shown so the pilot tester can verify the run.
+  const mainMessage = hasRedirect
+    ? 'Returning you to the survey…'
+    : 'Your session has been recorded. You can close this tab.';
+
+  const continueBtn = hasRedirect
+    ? `<button onclick="returnToPostSurvey()" class="inline-block px-6 py-2.5 bg-gray-800 text-white rounded-xl text-sm font-medium hover:bg-gray-700 transition mb-5">
+        Continue to survey
       </button>
-      <p class="text-xs text-gray-500 mb-4">If you are not redirected automatically, use the button above.</p>`
+      <p class="text-xs text-gray-400 mb-4">If you are not redirected automatically, tap the button above.</p>`
     : '';
+
   return `
     <div class="text-center py-2">
       <div class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">✓</div>
-      <h1 class="text-2xl font-bold text-gray-800 mb-2">Thank you</h1>
+      <h1 class="text-xl font-bold text-gray-800 mb-2">Your session has been recorded</h1>
       <p class="text-sm text-gray-600 leading-relaxed mb-6 max-w-md mx-auto">
-        Your session has been recorded. Please return to the survey window to
-        complete the remaining questions.
+        ${escapeHtml(mainMessage)}
       </p>
-      <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 mb-5 max-w-md mx-auto">
-        <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mb-2">Your completion code</div>
-        <div class="text-3xl font-bold text-gray-800 tracking-[0.25em] font-mono">${escapeHtml(code)}</div>
-        <p class="text-xs text-gray-500 mt-3 leading-relaxed">
-          Copy this code into the survey when prompted.
-        </p>
+      ${continueBtn}
+      <div class="text-[11px] text-gray-400 mt-4 mb-2">
+        Completion code (only needed if the survey asks): <span class="font-mono text-gray-500">${escapeHtml(code)}</span>
       </div>
-      ${postBtn}
-      <button onclick="downloadLog()" class="text-xs text-gray-500 hover:text-gray-800 underline">
-        Download a copy of your session (optional)
+      <button onclick="downloadLog()" class="text-[11px] text-gray-400 hover:text-gray-600 underline">
+        Download session log
       </button>
     </div>`;
 }
