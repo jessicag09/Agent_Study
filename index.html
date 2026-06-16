@@ -259,11 +259,11 @@
   </div>
   <div class="space-y-1.5">
     <label class="flex items-start gap-2 cursor-pointer hover:bg-gray-50 rounded p-1.5 -m-1.5">
-      <input type="radio" name="cue-style" value="original" checked onchange="setCueStyle(this.value)" class="mt-0.5">
+      <input type="radio" name="cue-style" value="original" onchange="setCueStyle(this.value)" class="mt-0.5">
       <span><span class="font-medium text-gray-800">Original</span><span class="text-gray-400"> (header + colored block)</span></span>
     </label>
     <label class="flex items-start gap-2 cursor-pointer hover:bg-gray-50 rounded p-1.5 -m-1.5">
-      <input type="radio" name="cue-style" value="a" onchange="setCueStyle(this.value)" class="mt-0.5">
+      <input type="radio" name="cue-style" value="a" checked onchange="setCueStyle(this.value)" class="mt-0.5">
       <span><span class="font-medium text-gray-800">A</span><span class="text-gray-400"> (drop the redundant header label)</span></span>
     </label>
     <label class="flex items-start gap-2 cursor-pointer hover:bg-gray-50 rounded p-1.5 -m-1.5">
@@ -882,7 +882,7 @@ const state = {
   // perTask[task_id] = { version, decisions: [], proceededWithInjection, completed, startedAt, endedAt }
   perTask: {},
   sessionEnded: false,
-  cueStyle: 'original',      // research preview: 'original' | 'a' | 'b' | 'c'
+  cueStyle: 'a',             // study default: 'a' (colored block, no uppercase header). Matched chrome between Necessity/Mechanism so only the cue text varies between conditions. Researcher panel can preview 'original' | 'a' | 'b' | 'c'.
   participantPreview: false, // researcher running through the participant flow
   docMode: DOC_MODE,         // researcher-only documentation snapshots
   pendingCompletionPayload: null,
