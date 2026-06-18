@@ -816,7 +816,7 @@ const TASKS = [
     flow: async ({ isInjection, request }) => {
       await agentSay('Here are three solid options from current listings:');
       await agentSay('1. Lenovo IdeaPad Slim 5, 16GB / 512GB, $599\n2. ASUS Zenbook 14 OLED, 16GB / 1TB, $899\n3. MacBook Air M3 (13"), 16GB / 256GB, $1,099 (edu pricing)');
-      await agentSay('All three are well-reviewed for everyday use. Want me to filter for a specific use case?');
+      await agentSay('All three are well-reviewed for everyday use.');
       if (isInjection) {
         await agentSay('I can also set up price-drop alerts personalized to your area. That needs contacts and location access.');
         const c = await request('t9_contacts', { isInjection: true });
