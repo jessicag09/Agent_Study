@@ -233,8 +233,7 @@
   <div id="walkthrough-tooltip" class="fixed bg-white rounded-xl shadow-xl p-4 pointer-events-auto" style="z-index: 70; max-width: 320px;">
     <div id="walkthrough-step-num" class="text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1"></div>
     <div id="walkthrough-caption" class="text-sm text-gray-800 mb-3"></div>
-    <div class="flex items-center gap-2 justify-between">
-      <button onclick="endWalkthrough(false)" class="text-xs text-gray-500 hover:text-gray-700">Skip</button>
+    <div class="flex items-center justify-end">
       <button id="walkthrough-next-btn" onclick="nextWalkthroughStep()" class="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Next</button>
     </div>
   </div>
@@ -1013,6 +1012,7 @@ const SURVEY_FLOW = [
     type: 'matrix', id: 'p2_clarity',
     question: 'For each of the following, how clearly did the agent communicate it?',
     min: 1, max: 5, minLabel: 'Not at all clear', maxLabel: 'Completely clear',
+    stepLabels: ['Not at all', 'Slightly', 'Moderately', 'Very', 'Completely'],
     statements: [
       { id: 'access', label: 'What access it wanted' },
       { id: 'intent', label: 'What it would do with that access' },
@@ -1028,16 +1028,6 @@ const SURVEY_FLOW = [
   // for stability — the Qualtrics original numbered it Part 4, but the
   // missing Part 3 looked odd to participants, so display-renumbered.)
   { type: 'section', id: 'part4_intro', title: 'Part 3: Security and Risk' },
-  {
-    type: 'matrix', id: 'p4_security_today',
-    question: 'Please rate how much you agree with each of the following statements about the AI agent you used in today\'s study.',
-    min: 1, max: 7, minLabel: 'Strongly disagree', maxLabel: 'Strongly agree',
-    statements: [
-      { id: 'safe',     label: 'I felt my information was safe with the AI agent in this study' },
-      { id: 'protect',  label: 'The agent acted in ways that protected my data' },
-      { id: 'comfort',  label: 'I would be comfortable letting an agent like this access my real accounts' },
-    ],
-  },
   {
     // V2: spell out every step instead of just the anchors. `stepLabels`
     // is rendered under each radio button by the scale renderer.
@@ -1057,6 +1047,7 @@ const SURVEY_FLOW = [
     type: 'matrix', id: 'p4_hesitancy_post',
     question: "Now that you've used the agent in this study, how much does each of the following make you hesitant to use AI agents that take actions on your behalf?",
     min: 1, max: 5, minLabel: 'Not at all Hesitant', maxLabel: 'Extremely Hesitant',
+    stepLabels: ['Not at all', 'Slightly', 'Moderately', 'Quite', 'Extremely'],
     statements: [
       { id: 'difficulty', label: 'Difficulty using them' },
       { id: 'privacy',    label: 'Privacy of my personal data' },
@@ -1087,8 +1078,19 @@ const SURVEY_FLOW = [
     ],
   },
 
-  // ─── PART 5: Prompt Injection (pre-debrief awareness) ───
-  { type: 'section', id: 'part6_intro', title: 'Part 5: Prompt Injection' },
+  // ─── Background (condensed) ───
+  // Notes asked to condense the background block. Dropped D2/D3
+  // (which mitigations / why-not-deployed) since those are about the
+  // respondent's own engineering practice, not their perspective on
+  // user behavior, which is what this study is asking. Kept D1, D4,
+  // D5 which all probe how experts read the user-facing security
+  // landscape. Removed the "I'm not sure" escape on D5 per notes.
+  //
+  // p6_familiarity lives here too (rather than in its own one-question
+  // section). It MUST appear before bg_background, because bg_background's
+  // skip-to-debrief gate would otherwise hide p6_familiarity from
+  // non-dev/cyber participants — and we want everyone to answer it.
+  { type: 'section', id: 'background_intro', title: 'Background' },
   {
     type: 'radio', id: 'p6_familiarity',
     question: 'How would you rate your understanding of prompt injection attacks?',
@@ -1100,15 +1102,6 @@ const SURVEY_FLOW = [
       { value: 'extremely_familiar', label: 'Extremely familiar' },
     ],
   },
-
-  // ─── Background (condensed) ───
-  // Notes asked to condense the background block. Dropped D2/D3
-  // (which mitigations / why-not-deployed) since those are about the
-  // respondent's own engineering practice, not their perspective on
-  // user behavior, which is what this study is asking. Kept D1, D4,
-  // D5 which all probe how experts read the user-facing security
-  // landscape. Removed the "I'm not sure" escape on D5 per notes.
-  { type: 'section', id: 'background_intro', title: 'Background' },
   {
     // Detailed background multi-select. Moved from the pre-survey
     // (Section 0) so it doesn't prime cyber-trained participants before
@@ -1246,7 +1239,6 @@ const SURVEY_RQ_MAP = {
   // Part 2
   p2_clarity:              'RQ3',
   // Part 4
-  p4_security_today:       'RQ2',
   p4_risk:                 'RQ2',
   p4_hesitancy_post:       'RQ2 (paired pre/post)',
   // Part 5
@@ -2112,12 +2104,15 @@ async function runCurrentTask() {
     : `All ${state.taskQueue.length} task${state.taskQueue.length > 1 ? 's' : ''} complete`);
 
   const isLast = state.currentIdx + 1 >= state.taskQueue.length;
+  // Brief delay before the Continue button appears (set below). Gives
+  // the agent's last message a moment to sit alone on screen so
+  // participants read it carefully before being offered the next action.
   document.getElementById('chat-footer-hint').textContent = isLast ? 'Session complete.' : 'Task complete.';
   const btn = document.getElementById('chat-next-btn');
   btn.textContent = isLast
     ? (shouldRunPostSurvey() ? 'Continue to post-study survey' : 'Finish session')
     : 'Continue to next task';
-  btn.classList.remove('hidden');
+  setTimeout(() => btn.classList.remove('hidden'), 1200);
 }
 
 function advanceTask() {
@@ -2580,9 +2575,18 @@ function renderSurveyStepBody(step) {
   }
 
   if (step.type === 'matrix') {
+    // Optional `stepLabels`: a short word/phrase shown UNDER each column
+    // number (e.g. "Slightly", "Moderately"). When present, the bottom
+    // min/max anchor row is hidden because every step is now self-labeled.
     const headers = [];
+    const stepLabels = step.stepLabels || [];
     for (let v = step.min; v <= step.max; v++) {
-      headers.push(`<th class="text-xs font-medium text-gray-500 pb-2 w-10 text-center">${v}</th>`);
+      const idx = v - step.min;
+      const lbl = stepLabels[idx] || '';
+      headers.push(`<th class="text-xs font-medium text-gray-500 pb-2 px-1 text-center align-bottom">
+        <div>${v}</div>
+        ${lbl ? `<div class="text-[10px] text-gray-400 mt-1 leading-tight font-normal">${escapeHtml(lbl)}</div>` : ''}
+      </th>`);
     }
     const rows = step.statements.map(s => {
       const cells = [];
@@ -2597,6 +2601,11 @@ function renderSurveyStepBody(step) {
         ${cells.join('')}
       </tr>`;
     }).join('');
+    const anchors = step.stepLabels ? '' : `
+      <div class="flex justify-between mt-3 text-[11px] text-gray-500">
+        <span>${escapeHtml(step.minLabel)}</span>
+        <span>${escapeHtml(step.maxLabel)}</span>
+      </div>`;
     return `
       ${header}
       <div class="overflow-x-auto">
@@ -2610,10 +2619,7 @@ function renderSurveyStepBody(step) {
           <tbody>${rows}</tbody>
         </table>
       </div>
-      <div class="flex justify-between mt-3 text-[11px] text-gray-500">
-        <span>${escapeHtml(step.minLabel)}</span>
-        <span>${escapeHtml(step.maxLabel)}</span>
-      </div>
+      ${anchors}
     `;
   }
 
