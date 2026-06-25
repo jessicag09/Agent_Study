@@ -949,24 +949,15 @@ const SURVEY_FLOW = [
     intro: 'This part of the survey should take approximately 10 minutes. There are no right or wrong answers.',
   },
   {
-    // Simplified to a single, clean concept. Catches participants who
-    // noticed something unusual but never thought to use the Report
-    // button (a subgroup that p1_reports_review's fallback misses,
-    // since that asks specifically about "considered reporting").
-    // No → skip describe and land on the reports review (which
-    // everyone sees so we capture both reporters and non-reporters).
-    type: 'radio', id: 'p1_noticed',
-    question: "Was there anything during the tasks that struck you as unusual?",
-    options: [
-      { value: 'yes', label: 'Yes' },
-      { value: 'no',  label: 'No'  },
-    ],
-    skipToIfValueIs: { no: 'p1_reports_review' },
-  },
-  {
-    type: 'textarea', id: 'p1_noticed_describe',
-    question: 'Briefly describe what you noticed.',
-    placeholder: 'Your answer…',
+    // Open textarea (no Yes/No gate) per advisor feedback that a binary
+    // forced-choice was too coarse for this construct. Participants who
+    // noticed something can describe it in their own words; those who
+    // didn't leave it blank. Catches the "noticed but didn't use the
+    // Report button" subgroup that p1_reports_review's fallback misses.
+    type: 'textarea', id: 'p1_noticed',
+    question: 'If anything during the tasks struck you as unusual, please briefly describe what you noticed.',
+    placeholder: 'Optional — leave blank if nothing comes to mind.',
+    required: false,
   },
   {
     // Reports-based detection review. Renderer pulls from state.reports:
@@ -996,19 +987,20 @@ const SURVEY_FLOW = [
     ],
   },
   {
+    // Reworded from "permission" to "approval" to cover both broad
+    // permissions (e.g. calendar access) AND specific actions (e.g.
+    // adding a CC). The agent in the prototype asks for both kinds
+    // of approval, so the broader noun captures everything.
     type: 'scale', id: 'p1_permission_clarity',
-    question: 'How well did you understand the purpose of each permission the agent requested?',
+    question: 'How well did you understand the purpose of each approval the agent asked for?',
     min: 1, max: 5,
     minLabel: 'Not at all clear', maxLabel: 'Completely clear',
     stepLabels: ['Not at all clear', 'Slightly clear', 'Moderately clear', 'Very clear', 'Completely clear'],
   },
-
-  // ─── PART 2: Permissions & Actions ───
-  { type: 'section', id: 'part2_intro', title: 'Part 2: Permissions & Actions' },
   {
-    // Collapsed three near-identical 1–5 scales into one matrix. Saves
-    // two steps, captures the same access/intent/risk-clarity signal
-    // that informs RQ3.
+    // Moved from "Part 2: Permissions & Actions" (now removed since it
+    // was a one-question section). Asks the granular communication-
+    // clarity construct that complements p1_permission_clarity above.
     type: 'matrix', id: 'p2_clarity',
     question: 'For each of the following, how clearly did the agent communicate it?',
     min: 1, max: 5, minLabel: 'Not at all clear', maxLabel: 'Completely clear',
@@ -1027,7 +1019,7 @@ const SURVEY_FLOW = [
   // (Numbered "Part 3" in display even though the id stays "part4_intro"
   // for stability — the Qualtrics original numbered it Part 4, but the
   // missing Part 3 looked odd to participants, so display-renumbered.)
-  { type: 'section', id: 'part4_intro', title: 'Part 3: Security and Risk' },
+  { type: 'section', id: 'part4_intro', title: 'Part 2: Security and Risk' },
   {
     // V2: spell out every step instead of just the anchors. `stepLabels`
     // is rendered under each radio button by the scale renderer.
@@ -1044,37 +1036,42 @@ const SURVEY_FLOW = [
     // shift hesitancy?). Wording mirrors the pre-survey item; the only
     // added clause is "Now that you've used the agent in this study,"
     // to anchor the time point.
-    type: 'matrix', id: 'p4_hesitancy_post',
-    question: "Now that you've used the agent in this study, how much does each of the following make you hesitant to use AI agents that take actions on your behalf?",
-    min: 1, max: 5, minLabel: 'Not at all Hesitant', maxLabel: 'Extremely Hesitant',
-    stepLabels: ['Not at all', 'Slightly', 'Moderately', 'Quite', 'Extremely'],
+    type: 'matrix', id: 'p4_concerns_post',
+    question: "Now that you've used the agent in this study, how much do you agree with each of the following?",
+    min: 1, max: 5, minLabel: 'Strongly disagree', maxLabel: 'Strongly agree',
+    stepLabels: ['Strongly disagree', 'Disagree', 'Neither', 'Agree', 'Strongly agree'],
     statements: [
-      { id: 'difficulty', label: 'Difficulty using them' },
-      { id: 'privacy',    label: 'Privacy of my personal data' },
-      { id: 'security',   label: 'Security concerns (viruses, malicious actions)' },
-      { id: 'mistakes',   label: 'Mistakes or unreliable results' },
+      { id: 'difficulty', label: "I'm concerned about how difficult they are to use" },
+      { id: 'privacy',    label: "I'm concerned about the privacy of my personal data" },
+      { id: 'security',   label: "I'm concerned about security risks (viruses, malicious actions)" },
+      { id: 'mistakes',   label: "I'm concerned about mistakes or unreliable results" },
     ],
   },
 
   // ─── PART 4: Reflection ───
-  { type: 'section', id: 'part5_intro', title: 'Part 4: Reflection' },
+  { type: 'section', id: 'part5_intro', title: 'Part 3: Reflection' },
   {
     type: 'textarea', id: 'p5_safer',
     question: 'What would make you feel safer using AI agents like the one in this study?',
     placeholder: 'Your answer…',
   },
   {
-    type: 'scale', id: 'p5_real_accounts',
-    question: 'How much did you treat the tasks in this study the way you would treat your real accounts and data?',
-    min: 1, max: 5,
-    minLabel: 'Not at all like my real accounts',
-    maxLabel: 'Exactly like my real accounts',
+    // Renamed from p5_real_accounts. The old wording asked whether they
+    // treated the tasks "like their real accounts" — almost guaranteed
+    // floor effect since participants know it's a study. New wording
+    // asks the behavioral hypothetical instead: would your decisions
+    // have been the same with real accounts on the line? Captures
+    // useful variance for validity moderation in analysis.
+    type: 'scale', id: 'p5_decision_realism',
+    question: 'If your own accounts and data were actually on the line, would you have made the same decisions in these tasks?',
+    min: 1, max: 4,
+    minLabel: 'Very different decisions',
+    maxLabel: 'Exactly the same decisions',
     stepLabels: [
-      'Not at all like my real accounts',
-      'A little like my real accounts',
-      'Somewhat like my real accounts',
-      'Mostly like my real accounts',
-      'Exactly like my real accounts',
+      'Very different decisions',
+      'Somewhat different decisions',
+      'Mostly the same decisions',
+      'Exactly the same decisions',
     ],
   },
 
@@ -1108,9 +1105,12 @@ const SURVEY_FLOW = [
     // they start the tasks. Also gives richer sample characterization
     // than the old binary dev/cyber/both gate.
     //
-    // Gate logic: D1/D4/D5 only show if Computer science/SE OR
-    // Cybersecurity is selected. Anything else (DS, UX, Soc. Sci.,
-    // Medicine, Arts, Other-only) skips straight to the Debrief.
+    // Gate logic: D1/D4/D5 only show if Computer science/SE,
+    // Cybersecurity, OR Data science/ML/AI is selected — all three
+    // backgrounds either build, defend, or design AI systems and have
+    // informed perspectives on prompt-injection risk. Anything else
+    // (UX, Social Sciences, Medicine, Arts, Other-only) skips straight
+    // to the Debrief.
     type: 'checkbox_with_other', id: 'bg_background',
     question: 'How would you best describe your background? (Select all that apply)',
     options: [
@@ -1123,7 +1123,11 @@ const SURVEY_FLOW = [
       'Arts / Music / Writing',
     ],
     skipToIfNoneSelected: {
-      values: ['Computer science / software engineering', 'Cybersecurity'],
+      values: [
+        'Computer science / software engineering',
+        'Cybersecurity',
+        'Data science / ML / AI',
+      ],
       target: 'debrief_intro',
     },
   },
@@ -1232,7 +1236,6 @@ const RQ_DEFINITIONS = {
 const SURVEY_RQ_MAP = {
   // Part 1
   p1_noticed:              'RQ1',
-  p1_noticed_describe:     'RQ1',
   p1_reports_review:       'RQ1, RQ3',
   p1_permission_decision:  'RQ3',
   p1_permission_clarity:   'RQ3',
@@ -1240,10 +1243,10 @@ const SURVEY_RQ_MAP = {
   p2_clarity:              'RQ3',
   // Part 4
   p4_risk:                 'RQ2',
-  p4_hesitancy_post:       'RQ2 (paired pre/post)',
+  p4_concerns_post:        'RQ2 (paired pre/post)',
   // Part 5
   p5_safer:                'RQ2 (design)',
-  p5_real_accounts:        'Validity check',
+  p5_decision_realism:     'Validity check',
   // Part 6
   p6_familiarity:          'RQ1, RQ4',
   // Background
