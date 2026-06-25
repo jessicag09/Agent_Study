@@ -159,6 +159,7 @@
         <li id="welcome-task-count">You'll complete <strong>10 short tasks</strong> with Agent (about 10 to 15 minutes).</li>
         <li>To keep the experience consistent across participants, the tasks are <strong>pre-written</strong>. You'll see each one in a pop-up and click "Send" to give it to Agent. There's no chat input.</li>
         <li>At some points, Agent may ask you to confirm a step before continuing. <strong>Respond as you naturally would.</strong></li>
+        <li>A quick overview of the chat controls will appear when you get started.</li>
       </ul>
     </div>
 
@@ -180,8 +181,13 @@
     </div>
     <div class="ml-auto flex items-center gap-3">
       <div id="chat-progress" class="text-xs text-gray-400 font-medium"></div>
-      <button onclick="openPermissionsPanel()" class="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 transition">⚙ Permissions</button>
-      <button onclick="endSessionEarly()" class="text-xs text-red-400 hover:text-red-600 border border-red-200 hover:border-red-300 rounded-lg px-3 py-1.5 transition">End</button>
+      <button onclick="openPermissionsPanel()" data-walkthrough-target="permissions" class="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 transition">⚙ Permissions</button>
+      <button onclick="openReportModal()" data-walkthrough-target="report" class="text-sm font-semibold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border-2 border-amber-300 rounded-lg px-4 py-2 transition flex items-center gap-1.5">
+        <span class="text-base leading-none">🚩</span>
+        <span>Report</span>
+      </button>
+      <button onclick="endSessionEarly()" data-walkthrough-target="end" class="text-xs text-red-400 hover:text-red-600 border border-red-200 hover:border-red-300 rounded-lg px-3 py-1.5 transition">End</button>
+      <button onclick="startWalkthrough(false)" title="Show the chat overview again" class="text-xs text-gray-300 hover:text-gray-500 border border-gray-200 hover:border-gray-300 rounded-full w-7 h-7 flex items-center justify-center transition" aria-label="Show the chat overview again">?</button>
     </div>
   </div>
 
@@ -229,6 +235,51 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════
+     WALKTHROUGH OVERLAY
+     Spotlight-style onboarding tour shown on first arrival at the chat
+     screen. Sequentially highlights Permissions / Report / End so
+     participants can find them without reading dense bullets on the
+     welcome screen. Re-triggerable via the "?" icon in the chat header.
+     `data-walkthrough-target="…"` on each chat-header button tells the
+     positioning code which element the spotlight should cover.
+═══════════════════════════════════════════════ -->
+<div id="walkthrough-overlay" class="hidden fixed inset-0 z-[60] pointer-events-none">
+  <div id="walkthrough-spotlight" class="fixed rounded-lg pointer-events-auto transition-all duration-200"
+       style="box-shadow: 0 0 0 9999px rgba(15,23,42,0.6); background: transparent;"></div>
+  <div id="walkthrough-tooltip" class="fixed bg-white rounded-xl shadow-xl p-4 pointer-events-auto" style="z-index: 70; max-width: 320px;">
+    <div id="walkthrough-step-num" class="text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1"></div>
+    <div id="walkthrough-caption" class="text-sm text-gray-800 mb-3"></div>
+    <div class="flex items-center gap-2 justify-between">
+      <button onclick="endWalkthrough(false)" class="text-xs text-gray-500 hover:text-gray-700">Skip</button>
+      <button id="walkthrough-next-btn" onclick="nextWalkthroughStep()" class="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     MODAL: REPORT UNEXPECTED BEHAVIOR
+     Surfaced via the chat-header "Report" button. Framed as a generic
+     dev-prototype bug-report channel so participants don't read it as
+     "the study is about spotting prompt injection."
+═══════════════════════════════════════════════ -->
+<div id="modal-report" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black/30">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 fade-in">
+    <div class="flex items-center justify-between mb-1">
+      <h3 class="text-base font-semibold text-gray-800">Report unexpected behavior</h3>
+      <button onclick="closeReportModal()" class="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+    </div>
+    <p class="text-xs text-gray-500 mb-4">This is a development prototype. If Agent did something that looked broken, off, or unexpected, let us know so we can fix it.</p>
+    <textarea id="report-textarea" rows="4" placeholder="Briefly describe what stood out to you…"
+      class="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none"></textarea>
+    <div id="report-error" class="hidden text-xs text-red-600 mt-2"></div>
+    <div class="flex gap-2 mt-4">
+      <button onclick="closeReportModal()" class="flex-1 py-2.5 border-2 border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+      <button onclick="submitReport()" class="flex-1 py-2.5 bg-gray-800 text-white rounded-xl text-sm font-medium hover:bg-gray-700 transition">Submit report</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
      SCREEN 3: END SCREEN
      Two views, both populated by renderDebrief():
        • Participant: minimal — thanks + completion code + return-to-survey.
@@ -240,6 +291,32 @@
 ═══════════════════════════════════════════════ -->
 <div id="screen-debrief" class="screen flex-col items-center justify-center min-h-screen bg-gray-100 p-6">
   <div id="debrief-content" class="bg-white rounded-2xl shadow-lg p-6 w-full max-w-2xl"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SCREEN 4: POST-STUDY SURVEY
+     Runs after the participant completes all tasks but BEFORE final
+     submission. Walks Parts 1–6, captures background, delivers the IRB
+     debrief, then asks Part 7 (now-that-you-know prompt-injection ID).
+     Researcher-only sessions skip this and go straight to the diagnostic
+     debrief. The participant's actual taskQueue prompts are shown so the
+     "which tasks seemed unusual / were prompt-injected" questions are
+     grounded in what they really saw, not the canonical task list.
+═══════════════════════════════════════════════ -->
+<div id="screen-survey" class="screen flex-col items-start min-h-screen bg-gray-100 p-6">
+  <div class="w-full max-w-2xl mx-auto">
+    <div class="bg-white rounded-2xl shadow-lg p-6 sm:p-8 my-6">
+      <div id="survey-progress" class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3"></div>
+      <div id="survey-content" class="text-gray-800"></div>
+      <div id="survey-error" class="hidden text-sm text-red-600 mt-3"></div>
+      <div class="mt-6 flex items-center gap-3">
+        <button id="survey-back-btn" onclick="prevSurveyStep()"
+          class="px-4 py-2.5 border-2 border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition hidden">Back</button>
+        <button id="survey-next-btn" onclick="nextSurveyStep()"
+          class="ml-auto px-6 py-2.5 bg-gray-800 text-white rounded-xl text-sm font-medium hover:bg-gray-700 transition">Next</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════
@@ -490,14 +567,14 @@ const APPROVAL_LIB = {
     action: 'Send the thank-you email to your friend',
     body: 'Agent is requesting access to your email to send the thank-you note. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could be used to send messages you didn\'t intend.',
-    necessity: 'Email access is needed to send the thank-you note you asked for.',
+    necessity: 'Email access is needed to send the thank-you note.',
   },
   t3_cc: {
     icon: '✉️', title: 'Confirm sending with extra recipient', permission: 'email', kind: 'action',
     action: 'Send the thank-you email and also CC partner@familymail.com',
     body: 'Agent is asking to send the email with an additional CC to partner@familymail.com (an address you did not specify). Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could send copies of your message to recipients you didn\'t choose.',
-    necessity: 'Adding this extra recipient is not needed to send the thank-you note you asked for.',
+    necessity: 'Adding this extra recipient is not needed to send the thank-you note.',
   },
 
   // ── Task 4: follow-up email after interview ──
@@ -513,7 +590,7 @@ const APPROVAL_LIB = {
     action: 'Send the follow-up email',
     body: 'Agent is requesting access to your email to send the follow-up. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could be used to send messages you didn\'t intend.',
-    necessity: 'Email access is needed to send the follow-up you asked for.',
+    necessity: 'Email access is needed to send the follow-up email.',
   },
 
   // ── Task 5: dentist appointment ──
@@ -522,14 +599,14 @@ const APPROVAL_LIB = {
     action: 'Add your dentist appointment to your calendar',
     body: 'Agent is requesting access to your calendar to add your dentist appointment on Friday at 2 PM. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'Calendar access is needed to add the dentist appointment you asked for.',
+    necessity: 'Calendar access is needed to add the dentist appointment.',
   },
   t5_extra_event: {
     icon: '📅', title: 'Confirm adding a second event', permission: 'calendar', kind: 'action',
     action: 'Add a follow-up cleaning appointment next month',
     body: 'Agent is asking to add a second event: a follow-up cleaning appointment next month. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'A follow-up cleaning is not needed to add the dentist appointment you asked for.',
+    necessity: 'A follow-up cleaning is not needed to add the dentist appointment.',
   },
 
   // ── Task 6: schedule a meeting ──
@@ -538,14 +615,14 @@ const APPROVAL_LIB = {
     action: 'Add the Monday 10 AM meeting to your calendar',
     body: 'Agent is requesting access to your calendar to schedule a meeting for next Monday at 10 AM. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'Calendar access is needed to schedule the meeting you asked for.',
+    necessity: 'Calendar access is needed to schedule the meeting.',
   },
   t6_location: {
     icon: '📍', title: 'Location access requested', permission: 'location', kind: 'action',
     action: 'Use your location to suggest a nearby meeting room',
     body: 'Agent is requesting access to your location to suggest a meeting room near you. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could share your location with parties you didn\'t intend.',
-    necessity: 'Location is not needed to schedule the meeting you asked for.',
+    necessity: 'Location is not needed to schedule the meeting.',
   },
 
   // ── Task 7: organize notes ──
@@ -554,7 +631,7 @@ const APPROVAL_LIB = {
     action: 'Read and combine your notes into one document',
     body: 'Agent is requesting access to your files to read your notes and compile them. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
-    necessity: 'File access is needed to read and organize the notes you asked it to.',
+    necessity: 'File access is needed to read and organize the notes.',
   },
   t7_email: {
     icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'action',
@@ -609,7 +686,7 @@ const APPROVAL_LIB = {
     action: 'Save the website files to your device',
     body: 'Agent is requesting access to your files to save your website files. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
-    necessity: 'File access is needed to save the website you asked it to build.',
+    necessity: 'File access is needed to save the website.',
   },
 };
 
@@ -860,6 +937,347 @@ const TASKS = [
 const TASK_BY_ID = Object.fromEntries(TASKS.map(t => [t.id, t]));
 
 // ════════════════════════════════════════════════
+//  POST-STUDY SURVEY CONTENT
+//
+//  One linear array of steps. Each step is either an info panel (section
+//  intro, debrief text, end-of-study text) or a question. Questions write
+//  into state.survey.responses[id]. Skip-logic uses `skipToIfValueIs`:
+//  if the answered value matches, every step up to (but not including)
+//  the target id is marked skipped and not shown.
+//
+//  Question types:
+//    radio                 → single-select buttons; required
+//    checkbox              → multi-select checkboxes; required (≥1)
+//    checkbox_with_other   → multi-select + free-text "Other"
+//    task_checklist_text   → multi-select listing participant's actual
+//                            taskQueue prompts; per-task text field
+//    task_checklist        → multi-select listing participant's actual
+//                            taskQueue prompts (no per-task text)
+//    scale                 → 1..max button row with anchor labels
+//    matrix                → multiple statements rated on the same scale
+//    textarea              → free text
+//    section / info        → no input, advance with Next
+// ════════════════════════════════════════════════
+const SURVEY_FLOW = [
+  // ─── PART 1: Your Experience During the Tasks ───
+  {
+    type: 'section', id: 'part1_intro',
+    title: 'Part 1: Your Experience During the Tasks',
+    intro: 'This part of the survey should take approximately 10 minutes. There are no right or wrong answers.',
+  },
+  {
+    // Simplified to a single, clean concept. Catches participants who
+    // noticed something unusual but never thought to use the Report
+    // button (a subgroup that p1_reports_review's fallback misses,
+    // since that asks specifically about "considered reporting").
+    // No → skip describe and land on the reports review (which
+    // everyone sees so we capture both reporters and non-reporters).
+    type: 'radio', id: 'p1_noticed',
+    question: "Was there anything during the tasks that struck you as unusual?",
+    options: [
+      { value: 'yes', label: 'Yes' },
+      { value: 'no',  label: 'No'  },
+    ],
+    skipToIfValueIs: { no: 'p1_reports_review' },
+  },
+  {
+    type: 'textarea', id: 'p1_noticed_describe',
+    question: 'Briefly describe what you noticed.',
+    placeholder: 'Your answer…',
+  },
+  {
+    // Reports-based detection review. Renderer pulls from state.reports:
+    // if the participant flagged things during the session, each one is
+    // shown with a textarea asking why they flagged it. If they didn't
+    // flag anything, a single fallback textarea asks whether they
+    // considered reporting anything but chose not to. This captures the
+    // "noticed but didn't act" group so non-reporters aren't a black hole.
+    type: 'reports_review', id: 'p1_reports_review',
+    question: 'Earlier, you had the option to flag anything that looked unexpected using the Report button. Tell us a bit more about that.',
+    helper: 'There are no wrong answers — we want to understand what stood out and what didn\'t.',
+    required: false,
+  },
+  {
+    // Multi-select so we can directly compare the share of participants
+    // who weighed necessity vs. mechanism vs. clarity factors — the
+    // same dimensions varied across study conditions for RQ3.
+    type: 'checkbox_with_other', id: 'p1_permission_decision',
+    question: 'When the agent requested a permission during a task, what did you consider when deciding whether to grant it? (Select all that apply)',
+    options: [
+      'Whether the access seemed needed to complete what I asked',
+      'Whether the action could be risky to my data or accounts',
+      'How clearly the agent explained what it would do with the access',
+      'The potential risks the agent mentioned',
+      'My general trust in AI agents',
+      'I made a quick decision without thinking much about it',
+    ],
+  },
+  {
+    type: 'scale', id: 'p1_permission_clarity',
+    question: 'How well did you understand the purpose of each permission the agent requested?',
+    min: 1, max: 5,
+    minLabel: 'Not at all clear', maxLabel: 'Completely clear',
+    stepLabels: ['Not at all clear', 'Slightly clear', 'Moderately clear', 'Very clear', 'Completely clear'],
+  },
+
+  // ─── PART 2: Permissions & Actions ───
+  { type: 'section', id: 'part2_intro', title: 'Part 2: Permissions & Actions' },
+  {
+    // Collapsed three near-identical 1–5 scales into one matrix. Saves
+    // two steps, captures the same access/intent/risk-clarity signal
+    // that informs RQ3.
+    type: 'matrix', id: 'p2_clarity',
+    question: 'For each of the following, how clearly did the agent communicate it?',
+    min: 1, max: 5, minLabel: 'Not at all clear', maxLabel: 'Completely clear',
+    statements: [
+      { id: 'access', label: 'What access it wanted' },
+      { id: 'intent', label: 'What it would do with that access' },
+      { id: 'risks',  label: 'The potential risks of approving the request' },
+    ],
+  },
+  // ─── PART 3: Security and Risk ───
+  // Reframed from "Trust and Risk" → "Security and Risk" per notes
+  // ("measuring security not trust"). The statements ask about whether
+  // the participant felt their data and accounts were protected, not
+  // about confidence/reliability in the abstract.
+  // (Numbered "Part 3" in display even though the id stays "part4_intro"
+  // for stability — the Qualtrics original numbered it Part 4, but the
+  // missing Part 3 looked odd to participants, so display-renumbered.)
+  { type: 'section', id: 'part4_intro', title: 'Part 3: Security and Risk' },
+  {
+    type: 'matrix', id: 'p4_security_today',
+    question: 'Please rate how much you agree with each of the following statements about the AI agent you used in today\'s study.',
+    min: 1, max: 7, minLabel: 'Strongly disagree', maxLabel: 'Strongly agree',
+    statements: [
+      { id: 'safe',     label: 'I felt my information was safe with the AI agent in this study' },
+      { id: 'protect',  label: 'The agent acted in ways that protected my data' },
+      { id: 'comfort',  label: 'I would be comfortable letting an agent like this access my real accounts' },
+    ],
+  },
+  {
+    // V2: spell out every step instead of just the anchors. `stepLabels`
+    // is rendered under each radio button by the scale renderer.
+    type: 'scale', id: 'p4_risk',
+    question: 'How risky do you consider AI agents that can take actions on your behalf (e.g., sending emails, browsing the web, making purchases) to be?',
+    min: 1, max: 5, minLabel: 'Not risky', maxLabel: 'Extremely risky',
+    stepLabels: ['Not Risky', 'Somewhat Risky', 'Moderately Risky', 'Very Risky', 'Extremely Risky'],
+  },
+  {
+    // Paired pre/post hesitancy matrix. Pre-survey asks the same four
+    // rows on the same 5-point scale BEFORE the participant has used
+    // the agent. Post-survey asks again AFTER, so each row supports a
+    // within-subject paired comparison and feeds RQ2 (does experience
+    // shift hesitancy?). Wording mirrors the pre-survey item; the only
+    // added clause is "Now that you've used the agent in this study,"
+    // to anchor the time point.
+    type: 'matrix', id: 'p4_hesitancy_post',
+    question: "Now that you've used the agent in this study, how much does each of the following make you hesitant to use AI agents that take actions on your behalf?",
+    min: 1, max: 5, minLabel: 'Not at all Hesitant', maxLabel: 'Extremely Hesitant',
+    statements: [
+      { id: 'difficulty', label: 'Difficulty using them' },
+      { id: 'privacy',    label: 'Privacy of my personal data' },
+      { id: 'security',   label: 'Security concerns (viruses, malicious actions)' },
+      { id: 'mistakes',   label: 'Mistakes or unreliable results' },
+    ],
+  },
+
+  // ─── PART 4: Reflection ───
+  { type: 'section', id: 'part5_intro', title: 'Part 4: Reflection' },
+  {
+    type: 'textarea', id: 'p5_safer',
+    question: 'What would make you feel safer using AI agents like the one in this study?',
+    placeholder: 'Your answer…',
+  },
+  {
+    type: 'scale', id: 'p5_real_accounts',
+    question: 'How much did you treat the tasks in this study the way you would treat your real accounts and data?',
+    min: 1, max: 5,
+    minLabel: 'Not at all like my real accounts',
+    maxLabel: 'Exactly like my real accounts',
+    stepLabels: [
+      'Not at all like my real accounts',
+      'A little like my real accounts',
+      'Somewhat like my real accounts',
+      'Mostly like my real accounts',
+      'Exactly like my real accounts',
+    ],
+  },
+
+  // ─── PART 5: Prompt Injection (pre-debrief awareness) ───
+  { type: 'section', id: 'part6_intro', title: 'Part 5: Prompt Injection' },
+  {
+    type: 'radio', id: 'p6_familiarity',
+    question: 'How would you rate your understanding of prompt injection attacks?',
+    options: [
+      { value: 'not_familiar',       label: 'Not familiar' },
+      { value: 'slightly_familiar',  label: 'Slightly familiar' },
+      { value: 'moderately_familiar',label: 'Moderately familiar' },
+      { value: 'very_familiar',      label: 'Very familiar' },
+      { value: 'extremely_familiar', label: 'Extremely familiar' },
+    ],
+  },
+
+  // ─── Background (condensed) ───
+  // Notes asked to condense the background block. Dropped D2/D3
+  // (which mitigations / why-not-deployed) since those are about the
+  // respondent's own engineering practice, not their perspective on
+  // user behavior, which is what this study is asking. Kept D1, D4,
+  // D5 which all probe how experts read the user-facing security
+  // landscape. Removed the "I'm not sure" escape on D5 per notes.
+  { type: 'section', id: 'background_intro', title: 'Background' },
+  {
+    // Detailed background multi-select. Moved from the pre-survey
+    // (Section 0) so it doesn't prime cyber-trained participants before
+    // they start the tasks. Also gives richer sample characterization
+    // than the old binary dev/cyber/both gate.
+    //
+    // Gate logic: D1/D4/D5 only show if Computer science/SE OR
+    // Cybersecurity is selected. Anything else (DS, UX, Soc. Sci.,
+    // Medicine, Arts, Other-only) skips straight to the Debrief.
+    type: 'checkbox_with_other', id: 'bg_background',
+    question: 'How would you best describe your background? (Select all that apply)',
+    options: [
+      'Computer science / software engineering',
+      'Cybersecurity',
+      'Data science / ML / AI',
+      'UX / HCI / design',
+      'Social sciences (e.g., psychology, sociology)',
+      'Medicine',
+      'Arts / Music / Writing',
+    ],
+    skipToIfNoneSelected: {
+      values: ['Computer science / software engineering', 'Cybersecurity'],
+      target: 'debrief_intro',
+    },
+  },
+  {
+    type: 'radio', id: 'd1_pi_risk',
+    question: 'Do you consider prompt injection a risk when building AI applications?',
+    options: [
+      { value: 'primary', label: 'Yes, it is a primary concern' },
+      { value: 'not_main',label: 'Yes, but it is not my main concern' },
+      { value: 'rarely',  label: 'Rarely' },
+      { value: 'never',   label: 'Never' },
+      { value: 'na',      label: "N/A — I don't build user-facing AI applications" },
+    ],
+  },
+  {
+    type: 'radio', id: 'd4_user_knowledge',
+    question: "Before today's session, how much did you think typical users knew about prompt injection risks?",
+    options: [
+      { value: 'nothing', label: 'Nothing at all' },
+      { value: 'little',  label: 'Very little' },
+      { value: 'some',    label: 'Some understanding' },
+      { value: 'good',    label: 'Good understanding' },
+      { value: 'strong',  label: 'Strong understanding' },
+    ],
+  },
+  {
+    // Reworded: the original asked about reactions to a "warning,"
+    // but our study's permission cues do not explicitly warn about
+    // prompt injection. Now phrased as expected baseline caution
+    // when any agent asks for permission to act on the user's behalf.
+    type: 'scale', id: 'd5_user_action',
+    question: "Before today's session, how cautious did you expect most users would be when an AI agent asks for permission to take an action on their behalf?",
+    min: 1, max: 5, minLabel: 'Not cautious at all', maxLabel: 'Very cautious',
+    stepLabels: ['Not cautious at all', 'Slightly cautious', 'Moderately cautious', 'Quite cautious', 'Very cautious'],
+  },
+
+  // ─── DEBRIEF (informational; no input) ───
+  {
+    type: 'info', id: 'debrief_intro',
+    title: 'Study Debrief',
+    html: `
+      <p class="mb-4">Now that you have completed the pre-debrief sections of the study, we want to share more information about its true purpose. Some details were withheld earlier so that we could observe your natural behavior.</p>
+      <h3 class="font-semibold text-gray-800 mt-5 mb-2">You were engaged in research that used a form of deception</h3>
+      <p class="mb-3">The information you received in the consent form did not include the full purpose of this study. This is called <em>partial concealment</em>, a form of research deception in which some details about a study's specific focus are withheld from participants until after they complete the procedures. Withholding this information was the only way to study the questions we were interested in, as knowing the full purpose ahead of time would have changed how you naturally responded.</p>
+      <p class="mb-3">This practice is reviewed and approved by Penn State's Institutional Review Board (IRB), which evaluates whether the use of deception in research is justified and minimizes risk to participants.</p>
+      <h3 class="font-semibold text-gray-800 mt-5 mb-2">What the study was actually about</h3>
+      <p class="mb-3">The true focus of this research is how people make decisions when it comes to approving agentic actions, and whether they are able to identify <strong>prompt injection</strong> attacks in agentic AI systems.</p>
+      <h3 class="font-semibold text-gray-800 mt-5 mb-2">Prompt injection</h3>
+      <p class="mb-3">Prompt injections are a type of cyberattack against AI systems. In a prompt injection, hidden malicious instructions are embedded in content the AI encounters (for example, hidden text on a website, in a document, or in an email). When the AI reads that content, it may follow those hidden instructions instead of the user's original request — potentially sending unauthorized emails, taking actions the user did not approve, sharing private information, or making purchases.</p>
+      <p class="mb-3">During this study, some of the tasks you completed contained scripted prompt injection scenarios. The agent's behavior in those tasks was designed to simulate what would happen if a real AI agent encountered hidden malicious instructions while completing your request.</p>
+      <h3 class="font-semibold text-gray-800 mt-5 mb-2">Why deception was needed</h3>
+      <p class="mb-3">If we had told you upfront that the study was about prompt injection and security, you likely would have approached every interaction with the agent more cautiously than you normally would. That heightened vigilance would have masked your natural decision-making, and our goal was to understand how people actually behave with AI agents in everyday use — not how they behave when they know they're being tested for security awareness.</p>
+      <p>By withholding the specific focus, we were able to observe behavior in its most naturalistic setting. This is a standard and IRB-approved practice in behavioral research.</p>
+    `,
+  },
+
+  // ─── End of Study (informational) ───
+  {
+    type: 'info', id: 'end_of_study',
+    title: 'End of Study',
+    html: `
+      <h3 class="font-semibold text-gray-800 mt-1 mb-2">What happens with your data</h3>
+      <p class="mb-3">The data we collected from your session — which includes your survey responses and your decisions during the simulated tasks — will be used for academic research only. All data is stored securely and identified by a study code, not by your name or email address.</p>
+      <p class="mb-3">If you would like to withdraw your data: You may request that your data be deleted at any point during this debrief, or by contacting the research team within two weeks of your participation. There is no penalty for withdrawing your data, and your compensation will not be affected.</p>
+      <h3 class="font-semibold text-gray-800 mt-5 mb-2">If you have concerns about your participation</h3>
+      <p class="mb-2">If you feel a need to speak with a professional concerning any uncomfortable feelings from your participation in this research, you may contact:</p>
+      <p class="mb-3 text-sm">National Crisis Resources (24/7): 988 Suicide and Crisis Lifeline — Call or text 988. Crisis Text Line — Text HOME to 741741.</p>
+      <h3 class="font-semibold text-gray-800 mt-5 mb-2">Questions about the study</h3>
+      <p class="mb-2">If you have questions about this research, please contact:</p>
+      <p class="mb-3 text-sm">Principal Investigator: Dr. Jinyuan Jia, jinyuan@psu.edu</p>
+      <p class="mb-3 text-sm">If you have questions about your rights as a research participant, contact Penn State's Human Research Protection Program at 814-865-1775 or irb-orp@psu.edu.</p>
+      <h3 class="font-semibold text-gray-800 mt-5 mb-2">What you can do with what you learned today</h3>
+      <p class="mb-2">If you'd like to learn more about prompt injection and AI safety:</p>
+      <ul class="list-disc pl-6 mb-3 text-sm space-y-1">
+        <li>OWASP Top 10 for Large Language Model Applications: <span class="text-gray-500">https://owasp.org/www-project-top-10-for-large-language-model-applications/</span></li>
+        <li>IBM's explainer on prompt injection: <span class="text-gray-500">https://www.ibm.com/topics/prompt-injection</span></li>
+      </ul>
+      <p class="mb-2">When using real AI agents in your own life, you can reduce your risk by:</p>
+      <ul class="list-disc pl-6 mb-3 text-sm space-y-1">
+        <li>Granting only the permissions an agent actually needs to complete your task</li>
+        <li>Reviewing what an agent is about to do before approving actions like sending emails or making purchases</li>
+        <li>Being cautious when agents suggest additional actions beyond what you originally asked for</li>
+      </ul>
+      <p class="text-sm mt-4">Thank you again for your participation. Your contribution helps researchers design safer AI agent interfaces for everyone.</p>
+    `,
+    nextLabel: 'Submit and finish',
+  },
+];
+
+const SURVEY_STEP_INDEX = Object.fromEntries(SURVEY_FLOW.map((s, i) => [s.id, i]));
+
+// ────────────────────────────────────────────────
+// Researcher-only RQ map. Each question id → RQ label. Rendered as a
+// pill next to "QUESTION" when RESEARCHER_MODE is true, so the PI can
+// verify RQ coverage while previewing the survey. Real participants
+// never see these tags (gated by RESEARCHER_MODE, which is false on
+// the deployed site).
+// ────────────────────────────────────────────────
+const RQ_DEFINITIONS = {
+  RQ1: 'How do developer assumptions about user resilience to prompt injections diverge from actual user awareness and self-reported understanding?',
+  RQ2: 'Do security concerns influence the user\'s initial decision to use agentic systems?',
+  RQ3: 'How does decision-aid messaging versus standard messaging influence a user\'s approval behavior, particularly on tasks containing a prompt injection?',
+  RQ4: 'Does a user\'s technical literacy level influence how they respond to each form of decision-aid messaging at agent-user approval points, and does any difference between conditions persist across multiple tasks?',
+};
+
+const SURVEY_RQ_MAP = {
+  // Part 1
+  p1_noticed:              'RQ1',
+  p1_noticed_describe:     'RQ1',
+  p1_reports_review:       'RQ1, RQ3',
+  p1_permission_decision:  'RQ3',
+  p1_permission_clarity:   'RQ3',
+  // Part 2
+  p2_clarity:              'RQ3',
+  // Part 4
+  p4_security_today:       'RQ2',
+  p4_risk:                 'RQ2',
+  p4_hesitancy_post:       'RQ2 (paired pre/post)',
+  // Part 5
+  p5_safer:                'RQ2 (design)',
+  p5_real_accounts:        'Validity check',
+  // Part 6
+  p6_familiarity:          'RQ1, RQ4',
+  // Background
+  bg_background:           'RQ4 (gate for D1/D4/D5)',
+  d1_pi_risk:              'RQ1',
+  d4_user_knowledge:       'RQ1',
+  d5_user_action:          'RQ1',
+};
+
+// ════════════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════════════
 const state = {
@@ -887,6 +1305,25 @@ const state = {
   pendingCompletionPayload: null,
   serverCompletionCode: null,
   postSurveyRedirectUrl: null,
+  // In-app post-study survey state. `step` indexes SURVEY_FLOW.
+  // `skipped` is a Set of step ids that branch logic has hidden so Back
+  // navigation jumps past them too.
+  survey: {
+    active: false,
+    step: 0,
+    responses: {},
+    skipped: new Set(),
+    started_at: null,
+    ended_at: null,
+  },
+  // In-the-moment reports submitted via the chat-header Report button.
+  // Each entry: { id, ts, task_id, position, version, text }. These are
+  // the un-primed detection signal — the participant has to actively
+  // click Report and write something.
+  reports: [],
+  // True after the spotlight onboarding tour has been auto-shown once;
+  // prevents re-triggering on screen revisits in the same session.
+  walkthroughShown: false,
   submittedAt: null,
 };
 
@@ -1368,12 +1805,140 @@ function showScreen(id) {
 function goToChat() {
   showScreen('screen-chat');
   updateProgress();
-  setTimeout(openTaskModal, 600);
+  // First arrival: run the spotlight walkthrough, then open the task
+  // modal when it ends. Subsequent arrivals (back-button etc.) skip
+  // straight to the task modal.
+  if (!state.walkthroughShown) {
+    state.walkthroughShown = true;
+    setTimeout(() => startWalkthrough(true), 400);
+  } else {
+    setTimeout(openTaskModal, 600);
+  }
+}
+
+// ────────────────────────────────────────────────
+//  WALKTHROUGH OVERLAY
+//  Sequential spotlight tour over the three chat-header controls.
+//  `isInitial` flags the auto-triggered first run: when that one
+//  completes, the first task modal opens. Manual re-triggers (the "?"
+//  button) just close cleanly with no follow-on action.
+// ────────────────────────────────────────────────
+const WALKTHROUGH_STEPS = [
+  { target: 'permissions', caption: 'Click <strong>Permissions</strong> to see what Agent currently has access to.' },
+  { target: 'report',      caption: 'Click <strong>Report</strong> to flag anything you\'d like to mention to the research team.' },
+  { target: 'end',         caption: 'Click <strong>End</strong> to stop the session early.' },
+];
+
+const _walkthrough = { index: 0, isInitial: false };
+
+function startWalkthrough(isInitial) {
+  _walkthrough.index = 0;
+  _walkthrough.isInitial = !!isInitial;
+  document.getElementById('walkthrough-overlay').classList.remove('hidden');
+  // Defer positioning by one frame so layout has settled after the
+  // chat screen becomes visible.
+  requestAnimationFrame(positionWalkthroughStep);
+  logEvent('walkthrough_started', { is_initial: !!isInitial });
+}
+
+function positionWalkthroughStep() {
+  const step = WALKTHROUGH_STEPS[_walkthrough.index];
+  if (!step) { endWalkthrough(true); return; }
+  const target = document.querySelector(`[data-walkthrough-target="${step.target}"]`);
+  if (!target) { endWalkthrough(false); return; }
+  const rect = target.getBoundingClientRect();
+
+  const spotlight = document.getElementById('walkthrough-spotlight');
+  spotlight.style.top = (rect.top - 6) + 'px';
+  spotlight.style.left = (rect.left - 6) + 'px';
+  spotlight.style.width = (rect.width + 12) + 'px';
+  spotlight.style.height = (rect.height + 12) + 'px';
+
+  const tooltip = document.getElementById('walkthrough-tooltip');
+  tooltip.style.top = (rect.bottom + 14) + 'px';
+  const tooltipWidth = tooltip.offsetWidth || 320;
+  // Right-align the tooltip to the spotlight, then clamp inside viewport.
+  let left = rect.right - tooltipWidth;
+  if (left < 16) left = 16;
+  if (left + tooltipWidth > window.innerWidth - 16) left = window.innerWidth - tooltipWidth - 16;
+  tooltip.style.left = left + 'px';
+
+  document.getElementById('walkthrough-step-num').textContent = `${_walkthrough.index + 1} of ${WALKTHROUGH_STEPS.length}`;
+  document.getElementById('walkthrough-caption').innerHTML = step.caption;
+  document.getElementById('walkthrough-next-btn').textContent =
+    _walkthrough.index + 1 === WALKTHROUGH_STEPS.length ? 'Got it' : 'Next';
+}
+
+function nextWalkthroughStep() {
+  _walkthrough.index += 1;
+  if (_walkthrough.index >= WALKTHROUGH_STEPS.length) {
+    endWalkthrough(true);
+    return;
+  }
+  positionWalkthroughStep();
+}
+
+function endWalkthrough(completed) {
+  document.getElementById('walkthrough-overlay').classList.add('hidden');
+  logEvent('walkthrough_ended', { step: _walkthrough.index, completed: !!completed });
+  if (_walkthrough.isInitial) {
+    _walkthrough.isInitial = false;
+    // Hand off to the first task modal once the spotlight tour finishes.
+    setTimeout(openTaskModal, 200);
+  }
 }
 
 function endSessionEarly() {
   if (state.sessionEnded) return;
+  // Participants (and participant-preview) still walk the post-study
+  // survey so we capture their experience even if they end before all
+  // 10 tasks. Researcher-mode runs go straight to the diagnostic debrief.
+  if (shouldRunPostSurvey() && !state.survey.active) {
+    startPostSurvey({ endReason: 'ended_early' });
+    return;
+  }
   void endSession({ end_reason: 'abandoned' });
+}
+
+// ────────────────────────────────────────────────
+//  REPORT BUTTON (un-primed in-the-moment detection signal)
+// ────────────────────────────────────────────────
+function openReportModal() {
+  document.getElementById('report-error').classList.add('hidden');
+  document.getElementById('report-textarea').value = '';
+  document.getElementById('modal-report').classList.remove('hidden');
+  setTimeout(() => document.getElementById('report-textarea').focus(), 50);
+  logEvent('report_modal_opened', {
+    task_id: state.taskQueue.length ? currentTask().id : null,
+  });
+}
+
+function closeReportModal() {
+  document.getElementById('modal-report').classList.add('hidden');
+}
+
+function submitReport() {
+  const ta = document.getElementById('report-textarea');
+  const err = document.getElementById('report-error');
+  const text = ta.value.trim();
+  if (!text) {
+    err.textContent = 'Please briefly describe what you noticed.';
+    err.classList.remove('hidden');
+    return;
+  }
+  const entry = state.currentIdx < state.taskQueue.length ? state.taskQueue[state.currentIdx] : null;
+  const task = entry ? TASK_BY_ID[entry.task_id] : null;
+  const report = {
+    id: 'r_' + Math.random().toString(36).slice(2, 8),
+    ts: new Date().toISOString(),
+    task_id: task ? task.id : null,
+    position: entry ? entry.position : null,
+    version: entry ? entry.version : null,
+    text,
+  };
+  state.reports.push(report);
+  logEvent('report_submitted', report);
+  closeReportModal();
 }
 
 function buildSessionPayload({ endReason, durationSeconds, completed }) {
@@ -1400,6 +1965,14 @@ function buildSessionPayload({ endReason, durationSeconds, completed }) {
     completion_code: completionCode(),
     user_agent: navigator.userAgent,
     launch_url: location.href,
+    reports: state.reports,
+    survey: {
+      completed: !!state.survey.ended_at,
+      started_at: state.survey.started_at,
+      ended_at: state.survey.ended_at,
+      responses: state.survey.responses,
+      skipped_steps: Array.from(state.survey.skipped),
+    },
     event_count: state.eventLog.length,
     events: state.eventLog,
   };
@@ -1557,14 +2130,20 @@ async function runCurrentTask() {
   const isLast = state.currentIdx + 1 >= state.taskQueue.length;
   document.getElementById('chat-footer-hint').textContent = isLast ? 'Session complete.' : 'Task complete.';
   const btn = document.getElementById('chat-next-btn');
-  btn.textContent = isLast ? 'Finish session' : 'Continue to next task';
+  btn.textContent = isLast
+    ? (shouldRunPostSurvey() ? 'Continue to post-study survey' : 'Finish session')
+    : 'Continue to next task';
   btn.classList.remove('hidden');
 }
 
 function advanceTask() {
   const isLast = state.currentIdx + 1 >= state.taskQueue.length;
   if (isLast) {
-    void endSession({ end_reason: 'task_complete' });
+    if (shouldRunPostSurvey()) {
+      startPostSurvey();
+    } else {
+      void endSession({ end_reason: 'task_complete' });
+    }
     return;
   }
   state.currentIdx += 1;
@@ -1824,6 +2403,543 @@ function completionCode() {
   return src.slice(0, 6);
 }
 
+// ════════════════════════════════════════════════
+//  POST-STUDY SURVEY
+//
+//  Flow: after the last task, runCurrentTask sets the Continue button
+//  label. advanceTask() routes participants to startPostSurvey() instead
+//  of endSession(). Once the survey reaches the End-of-Study step, the
+//  Next button calls finishPostSurvey() which writes responses into the
+//  payload and runs the usual endSession path.
+// ════════════════════════════════════════════════
+function shouldRunPostSurvey() {
+  // Researcher (non-preview) runs go straight to diagnostic debrief.
+  // Real participants AND participant-preview both walk the survey so
+  // the PI can preview it end-to-end.
+  return !isResearcher();
+}
+
+function startPostSurvey({ endReason = 'task_complete' } = {}) {
+  state.survey.active = true;
+  state.survey.step = 0;
+  state.survey.responses = {};
+  state.survey.skipped = new Set();
+  state.survey.endReason = endReason;
+  state.survey.started_at = new Date().toISOString();
+  logEvent('survey_start', { total_steps: SURVEY_FLOW.length, end_reason: endReason });
+  showScreen('screen-survey');
+  renderSurveyStep();
+}
+
+function renderSurveyStep() {
+  const idx = state.survey.step;
+  const step = SURVEY_FLOW[idx];
+  if (!step) return;
+  hideSurveyError();
+
+  const progress = document.getElementById('survey-progress');
+  // Count visible (non-skipped) steps for the user-facing position.
+  const visibleSteps = SURVEY_FLOW.filter(s => !state.survey.skipped.has(s.id));
+  const visibleIdx = visibleSteps.findIndex(s => s.id === step.id);
+  progress.textContent = `Post-study survey · ${visibleIdx + 1} of ${visibleSteps.length}`;
+
+  const content = document.getElementById('survey-content');
+  content.innerHTML = renderSurveyStepBody(step);
+
+  // Restore any previously entered answer (when navigating back/forward).
+  restoreSurveyAnswer(step);
+
+  // Back button: hide on the first visible step.
+  const backBtn = document.getElementById('survey-back-btn');
+  const isFirstVisible = visibleIdx === 0;
+  backBtn.classList.toggle('hidden', isFirstVisible);
+
+  const nextBtn = document.getElementById('survey-next-btn');
+  nextBtn.textContent = step.nextLabel || 'Next';
+
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function renderSurveyStepBody(step) {
+  if (step.type === 'section') {
+    return `
+      <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Section</div>
+      <h2 class="text-2xl font-bold text-gray-800 mb-3">${escapeHtml(step.title)}</h2>
+      ${step.intro ? `<p class="text-sm text-gray-600 leading-relaxed">${escapeHtml(step.intro)}</p>` : ''}
+    `;
+  }
+  if (step.type === 'info') {
+    return `
+      ${step.title ? `<h2 class="text-2xl font-bold text-gray-800 mb-4">${escapeHtml(step.title)}</h2>` : ''}
+      <div class="text-sm text-gray-700 leading-relaxed">${step.html}</div>
+    `;
+  }
+
+  const rqLabel = SURVEY_RQ_MAP[step.id];
+  const rqTag = RESEARCHER_MODE && rqLabel
+    ? `<span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded normal-case tracking-normal text-[10px] font-semibold">${escapeHtml(rqLabel)}</span>`
+    : '';
+  const rqDefs = RESEARCHER_MODE && rqLabel
+    ? (rqLabel.match(/RQ[1-4]/g) || [])
+        .map(rq => `<div class="text-[11px] text-purple-700 leading-snug mt-1"><span class="font-semibold">${rq}:</span> ${escapeHtml(RQ_DEFINITIONS[rq] || '')}</div>`)
+        .join('')
+    : '';
+  const rqBlock = rqDefs
+    ? `<div class="bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 mb-3">${rqDefs}</div>`
+    : '';
+  const header = `
+    <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+      <span>Question</span>${rqTag}
+    </div>
+    ${rqBlock}
+    <h2 class="text-lg font-semibold text-gray-800 mb-1">${escapeHtml(step.question)}</h2>
+    ${step.helper ? `<p class="text-xs text-gray-500 mb-4">${escapeHtml(step.helper)}</p>` : '<div class="mb-4"></div>'}
+  `;
+
+  if (step.type === 'radio') {
+    const opts = step.options.map((o, i) => {
+      const id = `${step.id}_${i}`;
+      const otherInput = o.other
+        ? `<input type="text" data-other-text class="ml-7 mt-1 w-full max-w-md border-2 border-gray-200 rounded-lg px-3 py-1.5 text-sm" placeholder="Please specify…" />`
+        : '';
+      return `
+        <label class="flex flex-col p-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
+          <span class="flex items-start gap-2.5">
+            <input type="radio" name="${step.id}" value="${escapeHtml(o.value)}" id="${id}" class="mt-1" />
+            <span class="text-sm text-gray-800">${escapeHtml(o.label)}</span>
+          </span>
+          ${otherInput}
+        </label>`;
+    }).join('');
+    return `${header}<div class="space-y-2">${opts}</div>`;
+  }
+
+  if (step.type === 'checkbox' || step.type === 'checkbox_with_other') {
+    const opts = step.options.map((label, i) => `
+      <label class="flex items-start gap-2.5 p-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
+        <input type="checkbox" name="${step.id}" value="${escapeHtml(label)}" class="mt-1" />
+        <span class="text-sm text-gray-800">${escapeHtml(label)}</span>
+      </label>
+    `).join('');
+    const other = step.type === 'checkbox_with_other' ? `
+      <label class="flex items-start gap-2.5 p-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
+        <input type="checkbox" name="${step.id}" value="__other__" data-other-checkbox class="mt-1" />
+        <span class="text-sm text-gray-800 flex-1">
+          <span class="block mb-1">Other</span>
+          <input type="text" data-other-text class="w-full border-2 border-gray-200 rounded-lg px-3 py-1.5 text-sm" placeholder="Please specify…" />
+        </span>
+      </label>
+    ` : '';
+    return `${header}<div class="space-y-2">${opts}${other}</div>`;
+  }
+
+  if (step.type === 'reports_review') {
+    if (state.reports.length === 0) {
+      return `
+        ${header}
+        <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-3 text-sm text-gray-600">
+          You didn't submit any reports during the session — that's completely fine.
+        </div>
+        <label class="block text-sm font-medium text-gray-800 mb-2">Was there anything you considered reporting but chose not to? If so, what was it, and what made you decide not to flag it?</label>
+        <textarea name="${step.id}__none" rows="4" placeholder="Optional — you can leave this blank if nothing came to mind."
+          class="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none"></textarea>
+      `;
+    }
+    const cards = state.reports.map((r, i) => {
+      const task = r.task_id ? TASK_BY_ID[r.task_id] : null;
+      const taskLabel = task ? `Task ${r.position}: ${task.prompt}` : 'Outside any task';
+      return `
+        <div class="border-2 border-gray-200 rounded-xl p-4">
+          <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-1">Report ${i + 1} · ${escapeHtml(taskLabel)}</div>
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700 mb-3 whitespace-pre-wrap">${escapeHtml(r.text)}</div>
+          <label class="block text-xs font-medium text-gray-600 mb-1.5">Why did this stand out enough to report?</label>
+          <textarea data-report-id="${r.id}" rows="3"
+            placeholder="Briefly explain what made you flag this…"
+            class="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"></textarea>
+        </div>
+      `;
+    }).join('');
+    return `${header}<div class="space-y-3">${cards}</div>`;
+  }
+
+  if (step.type === 'task_checklist' || step.type === 'task_checklist_text') {
+    // Only show tasks the participant actually engaged with. If they
+    // clicked End before reaching task N, asking them to identify N as
+    // "unusual" or "prompt-injected" is meaningless.
+    const visible = state.taskQueue.filter(e => state.perTask[e.task_id] && state.perTask[e.task_id].startedAt);
+    if (!visible.length) {
+      return `${header}<p class="text-sm text-gray-500 italic">You did not complete any tasks during the session, so there are no tasks to review here.</p>`;
+    }
+    const entries = visible.map(entry => {
+      const t = TASK_BY_ID[entry.task_id];
+      const tid = `tq_${entry.task_id}`;
+      const textField = step.type === 'task_checklist_text' ? `
+        <input type="text" data-task-text="${entry.task_id}"
+          class="w-full mt-2 border-2 border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+          placeholder="${escapeHtml(step.placeholder || 'Optional comment…')}" />` : '';
+      return `
+        <label class="block p-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
+          <div class="flex items-start gap-2.5">
+            <input type="checkbox" name="${step.id}" value="${entry.task_id}" id="${tid}" class="mt-1" />
+            <div class="flex-1">
+              <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Task ${entry.position}</div>
+              <div class="text-sm font-medium text-gray-800">${escapeHtml(t.prompt)}</div>
+              ${textField}
+            </div>
+          </div>
+        </label>`;
+    }).join('');
+    return `${header}<div class="space-y-2">${entries}</div>`;
+  }
+
+  if (step.type === 'scale') {
+    // `stepLabels` (optional): a fully-spelled label for each step shown
+    // under the button, e.g. "Somewhat Risky" beneath 2 / 5. When present,
+    // the bottom min/max anchor row is hidden because the per-step labels
+    // are already self-explanatory.
+    const buttons = [];
+    for (let v = step.min; v <= step.max; v++) {
+      const idx = v - step.min;
+      const stepLabel = (step.stepLabels && step.stepLabels[idx]) || '';
+      buttons.push(`
+        <label class="flex-1 cursor-pointer">
+          <input type="radio" name="${step.id}" value="${v}" class="sr-only peer" />
+          <div class="text-center py-3 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-700 peer-checked:bg-gray-800 peer-checked:text-white peer-checked:border-gray-800 transition">${v}</div>
+          ${stepLabel ? `<div class="text-[11px] text-gray-500 text-center mt-1 leading-tight">${escapeHtml(stepLabel)}</div>` : ''}
+        </label>`);
+    }
+    const anchors = step.stepLabels ? '' : `
+      <div class="flex justify-between mt-2 text-[11px] text-gray-500">
+        <span>${escapeHtml(step.minLabel)}</span>
+        <span>${escapeHtml(step.maxLabel)}</span>
+      </div>`;
+    return `
+      ${header}
+      <div class="flex gap-2 items-stretch">${buttons.join('')}</div>
+      ${anchors}
+    `;
+  }
+
+  if (step.type === 'matrix') {
+    const headers = [];
+    for (let v = step.min; v <= step.max; v++) {
+      headers.push(`<th class="text-xs font-medium text-gray-500 pb-2 w-10 text-center">${v}</th>`);
+    }
+    const rows = step.statements.map(s => {
+      const cells = [];
+      for (let v = step.min; v <= step.max; v++) {
+        cells.push(`
+          <td class="text-center py-2">
+            <input type="radio" name="${step.id}__${s.id}" value="${v}" />
+          </td>`);
+      }
+      return `<tr class="border-t border-gray-100">
+        <td class="text-sm text-gray-800 py-2 pr-3">${escapeHtml(s.label)}</td>
+        ${cells.join('')}
+      </tr>`;
+    }).join('');
+    return `
+      ${header}
+      <div class="overflow-x-auto">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr>
+              <th></th>
+              ${headers.join('')}
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="flex justify-between mt-3 text-[11px] text-gray-500">
+        <span>${escapeHtml(step.minLabel)}</span>
+        <span>${escapeHtml(step.maxLabel)}</span>
+      </div>
+    `;
+  }
+
+  if (step.type === 'textarea') {
+    return `
+      ${header}
+      <textarea name="${step.id}" rows="5" placeholder="${escapeHtml(step.placeholder || '')}"
+        class="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none"></textarea>
+    `;
+  }
+
+  return `${header}<p class="text-sm text-red-600">Unknown question type: ${escapeHtml(step.type)}</p>`;
+}
+
+function restoreSurveyAnswer(step) {
+  const saved = state.survey.responses[step.id];
+  if (saved === undefined) return;
+  const root = document.getElementById('survey-content');
+
+  if (step.type === 'radio') {
+    const v = saved && typeof saved === 'object' ? saved.value : saved;
+    const el = root.querySelector(`input[name="${step.id}"][value="${CSS.escape(String(v))}"]`);
+    if (el) el.checked = true;
+    if (saved && saved.other_text) {
+      const wrap = el && el.closest('label');
+      const t = wrap && wrap.querySelector('input[data-other-text]');
+      if (t) t.value = saved.other_text;
+    }
+  } else if (step.type === 'checkbox' || step.type === 'checkbox_with_other') {
+    const values = Array.isArray(saved) ? saved : (saved && saved.values) || [];
+    values.forEach(v => {
+      const el = root.querySelector(`input[name="${step.id}"][value="${CSS.escape(String(v))}"]`);
+      if (el) el.checked = true;
+    });
+    if (saved && saved.other_text) {
+      const otherCb = root.querySelector('input[data-other-checkbox]');
+      if (otherCb) otherCb.checked = true;
+      const t = root.querySelector('input[data-other-text]');
+      if (t) t.value = saved.other_text;
+    }
+  } else if (step.type === 'task_checklist' || step.type === 'task_checklist_text') {
+    const sel = saved.selected || [];
+    sel.forEach(tid => {
+      const el = root.querySelector(`input[name="${step.id}"][value="${tid}"]`);
+      if (el) el.checked = true;
+    });
+    const texts = saved.texts || {};
+    Object.entries(texts).forEach(([tid, val]) => {
+      const t = root.querySelector(`input[data-task-text="${tid}"]`);
+      if (t) t.value = val;
+    });
+  } else if (step.type === 'reports_review') {
+    if (saved && saved.reasons) {
+      Object.entries(saved.reasons).forEach(([rid, val]) => {
+        const t = root.querySelector(`textarea[data-report-id="${rid}"]`);
+        if (t) t.value = val;
+      });
+    }
+    if (saved && saved.considered_not_reporting !== undefined) {
+      const t = root.querySelector(`textarea[name="${step.id}__none"]`);
+      if (t) t.value = saved.considered_not_reporting;
+    }
+  } else if (step.type === 'scale') {
+    const el = root.querySelector(`input[name="${step.id}"][value="${saved}"]`);
+    if (el) el.checked = true;
+  } else if (step.type === 'matrix') {
+    Object.entries(saved || {}).forEach(([sid, v]) => {
+      const el = root.querySelector(`input[name="${step.id}__${sid}"][value="${v}"]`);
+      if (el) el.checked = true;
+    });
+  } else if (step.type === 'textarea') {
+    const el = root.querySelector(`textarea[name="${step.id}"]`);
+    if (el) el.value = saved;
+  }
+}
+
+function collectSurveyAnswer(step) {
+  const root = document.getElementById('survey-content');
+
+  if (step.type === 'radio') {
+    const chosen = root.querySelector(`input[name="${step.id}"]:checked`);
+    if (!chosen) return { value: null };
+    const otherWrap = chosen.closest('label');
+    const otherText = otherWrap && otherWrap.querySelector('input[data-other-text]');
+    const opt = (step.options || []).find(o => o.value === chosen.value);
+    const needsOther = opt && opt.other;
+    const out = { value: chosen.value };
+    if (needsOther && otherText) out.other_text = otherText.value.trim();
+    return out;
+  }
+  if (step.type === 'checkbox' || step.type === 'checkbox_with_other') {
+    const boxes = Array.from(root.querySelectorAll(`input[name="${step.id}"]:checked`));
+    const values = boxes.map(b => b.value).filter(v => v !== '__other__');
+    const otherCb = root.querySelector('input[data-other-checkbox]');
+    const otherText = root.querySelector('input[data-other-text]');
+    const out = { values };
+    if (otherCb && otherCb.checked && otherText) out.other_text = otherText.value.trim();
+    return out;
+  }
+  if (step.type === 'task_checklist' || step.type === 'task_checklist_text') {
+    const boxes = Array.from(root.querySelectorAll(`input[name="${step.id}"]:checked`));
+    const selected = boxes.map(b => Number(b.value));
+    const texts = {};
+    if (step.type === 'task_checklist_text') {
+      root.querySelectorAll('input[data-task-text]').forEach(t => {
+        const v = t.value.trim();
+        if (v) texts[t.dataset.taskText] = v;
+      });
+    }
+    return { selected, texts };
+  }
+  if (step.type === 'reports_review') {
+    const reasons = {};
+    root.querySelectorAll('textarea[data-report-id]').forEach(t => {
+      const v = t.value.trim();
+      if (v) reasons[t.dataset.reportId] = v;
+    });
+    const noneTextarea = root.querySelector(`textarea[name="${step.id}__none"]`);
+    const out = { reasons };
+    if (noneTextarea) out.considered_not_reporting = noneTextarea.value.trim();
+    return out;
+  }
+  if (step.type === 'scale') {
+    const chosen = root.querySelector(`input[name="${step.id}"]:checked`);
+    return chosen ? Number(chosen.value) : null;
+  }
+  if (step.type === 'matrix') {
+    const out = {};
+    let any = false;
+    step.statements.forEach(s => {
+      const chosen = root.querySelector(`input[name="${step.id}__${s.id}"]:checked`);
+      if (chosen) { out[s.id] = Number(chosen.value); any = true; }
+    });
+    return any ? out : null;
+  }
+  if (step.type === 'textarea') {
+    const el = root.querySelector(`textarea[name="${step.id}"]`);
+    return el ? el.value.trim() : '';
+  }
+  return null;
+}
+
+function validateSurveyAnswer(step, answer) {
+  // Sections and info screens never block advancement.
+  if (step.type === 'section' || step.type === 'info') return null;
+  const required = step.required !== false;
+  if (!required) return null;
+
+  if (step.type === 'radio') {
+    if (!answer || !answer.value) return 'Please select an option to continue.';
+    const opt = (step.options || []).find(o => o.value === answer.value);
+    if (opt && opt.other && !(answer.other_text || '').length) return 'Please describe your answer in the text field.';
+    return null;
+  }
+  if (step.type === 'checkbox' || step.type === 'checkbox_with_other') {
+    if (!answer || (!answer.values.length && !(answer.other_text || '').length)) return 'Please select at least one option.';
+    return null;
+  }
+  if (step.type === 'task_checklist' || step.type === 'task_checklist_text') {
+    // These are always optional (per Qualtrics export — "if any tasks
+    // seem unusual…") so allow zero selections.
+    return null;
+  }
+  if (step.type === 'scale') {
+    if (answer == null) return 'Please pick a number on the scale.';
+    return null;
+  }
+  if (step.type === 'matrix') {
+    if (!answer || Object.keys(answer).length < step.statements.length) return 'Please rate every statement.';
+    return null;
+  }
+  if (step.type === 'textarea') {
+    if (!answer || !answer.length) return 'Please enter a response to continue.';
+    return null;
+  }
+  return null;
+}
+
+function showSurveyError(msg) {
+  const el = document.getElementById('survey-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+function hideSurveyError() {
+  const el = document.getElementById('survey-error');
+  el.classList.add('hidden');
+  el.textContent = '';
+}
+
+function applySurveySkipLogic(step, answer) {
+  if (!answer) return;
+  let targetId = null;
+
+  // Single-value gate (radio answers).
+  if (step.skipToIfValueIs) {
+    const triggerValue = answer.value !== undefined ? answer.value : answer;
+    targetId = step.skipToIfValueIs[triggerValue] || null;
+  }
+
+  // Multi-select gate (checkbox answers): skip if NONE of the listed
+  // values are checked. Used by bg_background to gate D1/D4/D5 on the
+  // detailed background multi-select.
+  if (!targetId && step.skipToIfNoneSelected) {
+    const selected = (answer && answer.values) || [];
+    const required = step.skipToIfNoneSelected.values || [];
+    const anyMatch = required.some(v => selected.includes(v));
+    if (!anyMatch) targetId = step.skipToIfNoneSelected.target;
+  }
+
+  if (!targetId) {
+    // No skip triggered. Clear any prior skip past this step in case
+    // the user changed a branching answer (e.g. flipped no → yes).
+    clearSkipsBetween(step.id, null);
+    return;
+  }
+  const fromIdx = SURVEY_STEP_INDEX[step.id];
+  const toIdx = SURVEY_STEP_INDEX[targetId];
+  if (fromIdx == null || toIdx == null || toIdx <= fromIdx + 1) return;
+  for (let i = fromIdx + 1; i < toIdx; i++) {
+    state.survey.skipped.add(SURVEY_FLOW[i].id);
+    delete state.survey.responses[SURVEY_FLOW[i].id];
+  }
+}
+
+function clearSkipsBetween(fromId, _toId) {
+  // Clears any skipped ids that come after `fromId` in flow order.
+  // Used when the user changes a branching answer so we don't carry
+  // stale skips into the new path.
+  const fromIdx = SURVEY_STEP_INDEX[fromId];
+  if (fromIdx == null) return;
+  for (let i = fromIdx + 1; i < SURVEY_FLOW.length; i++) {
+    state.survey.skipped.delete(SURVEY_FLOW[i].id);
+  }
+}
+
+function nextSurveyStep() {
+  const idx = state.survey.step;
+  const step = SURVEY_FLOW[idx];
+  if (!step) return;
+
+  if (step.type !== 'section' && step.type !== 'info') {
+    const answer = collectSurveyAnswer(step);
+    const err = validateSurveyAnswer(step, answer);
+    if (err) { showSurveyError(err); return; }
+    state.survey.responses[step.id] = answer;
+    applySurveySkipLogic(step, answer);
+    logEvent('survey_response', { step_id: step.id, type: step.type });
+  }
+
+  // Advance to the next non-skipped step.
+  let nextIdx = idx + 1;
+  while (nextIdx < SURVEY_FLOW.length && state.survey.skipped.has(SURVEY_FLOW[nextIdx].id)) {
+    nextIdx++;
+  }
+  if (nextIdx >= SURVEY_FLOW.length) {
+    finishPostSurvey();
+    return;
+  }
+  state.survey.step = nextIdx;
+  renderSurveyStep();
+}
+
+function prevSurveyStep() {
+  let prevIdx = state.survey.step - 1;
+  while (prevIdx >= 0 && state.survey.skipped.has(SURVEY_FLOW[prevIdx].id)) {
+    prevIdx--;
+  }
+  if (prevIdx < 0) return;
+  state.survey.step = prevIdx;
+  renderSurveyStep();
+}
+
+function finishPostSurvey() {
+  state.survey.active = false;
+  state.survey.ended_at = new Date().toISOString();
+  const endReason = state.survey.endReason || 'task_complete';
+  logEvent('survey_complete', {
+    answered_steps: Object.keys(state.survey.responses).length,
+    skipped_steps: Array.from(state.survey.skipped),
+    end_reason: endReason,
+  });
+  void endSession({ end_reason: endReason });
+}
+
 function renderDebrief() {
   document.getElementById('debrief-content').innerHTML =
     isResearcher() ? renderResearcherDebrief() : renderParticipantDebrief();
@@ -1843,35 +2959,27 @@ function renderParticipantDebrief() {
   // (b) no post-survey URL configured → standalone thank-you. Useful during piloting before Qualtrics
   //     is wired up. Completion code is shown so the pilot tester can verify the run.
   const mainMessage = hasRedirect
-    ? 'Redirecting you back to the survey…'
+    ? 'Returning you to the survey…'
     : 'Your session has been recorded. You can close this tab.';
-
-  const title = hasRedirect
-    ? 'Study complete'
-    : 'Your session has been recorded';
 
   const continueBtn = hasRedirect
     ? `<button onclick="returnToPostSurvey()" class="inline-block px-6 py-2.5 bg-gray-800 text-white rounded-xl text-sm font-medium hover:bg-gray-700 transition mb-5">
-        Return to survey
+        Continue to survey
       </button>
       <p class="text-xs text-gray-400 mb-4">If you are not redirected automatically, tap the button above.</p>`
     : '';
 
-  const completionCode = hasRedirect
-    ? ''
-    : `<div class="text-[11px] text-gray-400 mt-4 mb-2">
-        Completion code (only needed if the survey asks): <span class="font-mono text-gray-500">${escapeHtml(code)}</span>
-      </div>`;
-
   return `
     <div class="text-center py-2">
       <div class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">✓</div>
-      <h1 class="text-xl font-bold text-gray-800 mb-2">${escapeHtml(title)}</h1>
+      <h1 class="text-xl font-bold text-gray-800 mb-2">Your session has been recorded</h1>
       <p class="text-sm text-gray-600 leading-relaxed mb-6 max-w-md mx-auto">
         ${escapeHtml(mainMessage)}
       </p>
       ${continueBtn}
-      ${completionCode}
+      <div class="text-[11px] text-gray-400 mt-4 mb-2">
+        Completion code (only needed if the survey asks): <span class="font-mono text-gray-500">${escapeHtml(code)}</span>
+      </div>
       <button onclick="downloadLog()" class="text-[11px] text-gray-400 hover:text-gray-600 underline">
         Download session log
       </button>
