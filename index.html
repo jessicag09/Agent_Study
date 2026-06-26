@@ -1131,12 +1131,12 @@ const SURVEY_FLOW = [
     // they start the tasks. Also gives richer sample characterization
     // than the old binary dev/cyber/both gate.
     //
-    // Gate logic: D1/D4/D5 only show if Computer science/SE,
+    // Gate logic: D1/D4/D5/D6 only show if Computer science/SE,
     // Cybersecurity, OR Data science/ML/AI is selected — all three
     // backgrounds either build, defend, or design AI systems and have
-    // informed perspectives on prompt-injection risk. Anything else
-    // (UX, Social Sciences, Medicine, Arts, Other-only) skips straight
-    // to the Debrief.
+    // informed perspectives on prompt-injection risk. All other
+    // categories (broader workforce options added for representative
+    // sample characterization) skip straight to the Debrief.
     type: 'checkbox_with_other', id: 'bg_background',
     question: 'How would you best describe your background? (Select all that apply)',
     options: [
@@ -1144,9 +1144,13 @@ const SURVEY_FLOW = [
       'Cybersecurity',
       'Data science / ML / AI',
       'UX / HCI / design',
-      'Social sciences (e.g., psychology, sociology)',
-      'Medicine',
+      'Other technical (engineering, IT support, etc.)',
+      'Business / marketing / sales / finance',
+      'Healthcare (clinical or administrative)',
+      'Education / teaching',
+      'Social sciences / humanities',
       'Arts / Music / Writing',
+      'Trades / skilled labor / service work',
     ],
     skipToIfNoneSelected: {
       values: [
