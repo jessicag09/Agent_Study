@@ -1078,7 +1078,7 @@ const SURVEY_FLOW = [
   { type: 'section', id: 'part5_intro', title: 'Part 3: Reflection' },
   {
     type: 'textarea', id: 'p5_safer',
-    question: 'What would make you feel safer using AI agents that take actions on your behalf?',
+    question: 'What, if anything, would change how willing you are to use AI agents that take actions on your behalf?',
     placeholder: 'Your answer…',
   },
   {
@@ -1189,6 +1189,20 @@ const SURVEY_FLOW = [
     min: 1, max: 5, minLabel: 'Not cautious at all', maxLabel: 'Very cautious',
     stepLabels: ['Not cautious at all', 'Slightly cautious', 'Moderately cautious', 'Quite cautious', 'Very cautious'],
   },
+  {
+    // Bridge question between RQ1 (dev assumptions) and RQ3 (cue
+    // manipulation): asks devs to predict which intervention style
+    // helps users most. Lets us compare their prediction to the
+    // actual condition results from the participant sample.
+    type: 'checkbox_with_other', id: 'd6_intervention',
+    question: 'Which of the following do you think would be most effective at helping users detect agent actions that could be misused? (Select all that apply)',
+    options: [
+      'A simple permission request, with no extra explanation',
+      "An explanation of whether the requested action is necessary for the user's task",
+      'An explanation of how the requested action could be misused (e.g., by prompt injection)',
+      'Both the necessity and misuse explanations together',
+    ],
+  },
 
   // ─── DEBRIEF (informational; no input) ───
   {
@@ -1280,6 +1294,7 @@ const SURVEY_RQ_MAP = {
   d1_pi_risk:              'RQ1',
   d4_user_knowledge:       'RQ1',
   d5_user_action:          'RQ1',
+  d6_intervention:         'RQ1, RQ3 (bridge)',
 };
 
 // ════════════════════════════════════════════════
