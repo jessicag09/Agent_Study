@@ -181,7 +181,7 @@
     </div>
     <div class="ml-auto flex items-center gap-3">
       <div id="chat-progress" data-walkthrough-target="progress" class="text-xs text-gray-400 font-medium"></div>
-      <button onclick="openReportModal()" data-walkthrough-target="report" class="text-sm font-semibold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border-2 border-amber-300 rounded-lg px-4 py-2 transition flex items-center gap-1.5">
+      <button onclick="openReportModal()" data-walkthrough-target="report" class="text-sm font-semibold text-purple-700 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border-2 border-purple-300 rounded-lg px-4 py-2 transition flex items-center gap-1.5">
         <span class="text-base leading-none">🚩</span>
         <span>Report</span>
       </button>
@@ -956,7 +956,7 @@ const SURVEY_FLOW = [
     // Report button" subgroup that p1_reports_review's fallback misses.
     type: 'textarea', id: 'p1_noticed',
     question: 'If anything during the tasks struck you as unusual, please briefly describe what you noticed.',
-    placeholder: 'Optional — leave blank if nothing comes to mind.',
+    placeholder: 'Briefly describe what stood out to you…',
     required: false,
   },
   {
@@ -1052,7 +1052,7 @@ const SURVEY_FLOW = [
   { type: 'section', id: 'part5_intro', title: 'Part 3: Reflection' },
   {
     type: 'textarea', id: 'p5_safer',
-    question: 'What would make you feel safer using AI agents like the one in this study?',
+    question: 'What would make you feel safer using AI agents that take actions on your behalf?',
     placeholder: 'Your answer…',
   },
   {
@@ -1063,15 +1063,15 @@ const SURVEY_FLOW = [
     // have been the same with real accounts on the line? Captures
     // useful variance for validity moderation in analysis.
     type: 'scale', id: 'p5_decision_realism',
-    question: 'If your own accounts and data were actually on the line, would you have made the same decisions in these tasks?',
+    question: 'How similar were your decisions in this study to how you would handle similar requests with your own accounts and data?',
     min: 1, max: 4,
-    minLabel: 'Very different decisions',
-    maxLabel: 'Exactly the same decisions',
+    minLabel: 'Not at all similar',
+    maxLabel: 'Very similar',
     stepLabels: [
-      'Very different decisions',
-      'Somewhat different decisions',
-      'Mostly the same decisions',
-      'Exactly the same decisions',
+      'Not at all similar',
+      'Slightly similar',
+      'Mostly similar',
+      'Very similar',
     ],
   },
 
@@ -2498,7 +2498,7 @@ function renderSurveyStepBody(step) {
           You didn't submit any reports during the session — that's completely fine.
         </div>
         <label class="block text-sm font-medium text-gray-800 mb-2">Was there anything you considered reporting but chose not to? If so, what was it, and what made you decide not to flag it?</label>
-        <textarea name="${step.id}__none" rows="4" placeholder="Optional — you can leave this blank if nothing came to mind."
+        <textarea name="${step.id}__none" rows="4" placeholder="Describe what you considered and what made you decide not to flag it…"
           class="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none"></textarea>
       `;
     }
@@ -2766,6 +2766,12 @@ function collectSurveyAnswer(step) {
 }
 
 function validateSurveyAnswer(step, answer) {
+  // TEMP for advisor review: every step is skippable EXCEPT bg_background,
+  // which still requires a selection so reviewers actually land on the
+  // dev-only Q16-18 (gated on background). Remove this exception block
+  // before launching to re-enable per-step required checks for everything.
+  if (step.id !== 'bg_background') return null;
+  // ─── original validation below ───
   // Sections and info screens never block advancement.
   if (step.type === 'section' || step.type === 'info') return null;
   const required = step.required !== false;
