@@ -19,6 +19,32 @@
     pre { white-space: pre-wrap; word-wrap: break-word; }
     .modal-overlay { backdrop-filter: blur(2px); }
     .narration { white-space: pre-wrap; }
+    /* Hide the chat scrollbar entirely — auto-scroll keeps the latest
+       message visible, the bar was visually heavy, and content stays
+       scrollable via wheel/trackpad. */
+    #chat-messages { scrollbar-width: none; }
+    #chat-messages::-webkit-scrollbar { display: none; }
+    /* Slim scrollbars elsewhere (textareas, survey scroll regions, code
+       blocks) where users actually do need to scroll. */
+    .overflow-y-auto, textarea, pre {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
+    }
+    .overflow-y-auto::-webkit-scrollbar,
+    textarea::-webkit-scrollbar,
+    pre::-webkit-scrollbar { width: 6px; height: 6px; }
+    .overflow-y-auto::-webkit-scrollbar-track,
+    textarea::-webkit-scrollbar-track,
+    pre::-webkit-scrollbar-track { background: transparent; }
+    .overflow-y-auto::-webkit-scrollbar-thumb,
+    textarea::-webkit-scrollbar-thumb,
+    pre::-webkit-scrollbar-thumb {
+      background: rgba(15, 23, 42, 0.18);
+      border-radius: 3px;
+    }
+    .overflow-y-auto::-webkit-scrollbar-thumb:hover,
+    textarea::-webkit-scrollbar-thumb:hover,
+    pre::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 0.35); }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -172,7 +198,7 @@
 <!-- ═══════════════════════════════════════════════
      SCREEN 2: CHAT
 ═══════════════════════════════════════════════ -->
-<div id="screen-chat" class="screen flex-col min-h-screen bg-gray-50">
+<div id="screen-chat" class="screen flex-col h-screen bg-gray-50">
   <div class="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 shadow-sm">
     <div class="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center text-lg">🤖</div>
     <div data-walkthrough-target="status">
@@ -1896,6 +1922,24 @@ function closeReportModal() {
   document.getElementById('modal-report').classList.add('hidden');
 }
 
+// Snapshot the last few visible chat-messages elements so the post-
+// survey reports-review can show participants what they were looking
+// at when they clicked Report. Without this, by the time they answer
+// "why did you flag this?" they often can't reconstruct the context.
+function captureChatContext(maxItems = 5) {
+  const container = document.getElementById('chat-messages');
+  if (!container) return [];
+  const all = Array.from(container.children).filter(el => el.id !== 'typing-indicator');
+  return all.slice(-maxItems).map(el => {
+    let kind = 'agent';
+    if (el.querySelector('.bg-gray-800.text-white')) kind = 'user';
+    else if (el.querySelector('.border-blue-200')) kind = 'approval';
+    else if (el.classList.contains('text-center')) kind = 'divider';
+    const text = (el.innerText || '').trim();
+    return { kind, text: text.length > 600 ? text.slice(0, 600) + '…' : text };
+  });
+}
+
 function submitReport() {
   const ta = document.getElementById('report-textarea');
   const err = document.getElementById('report-error');
@@ -1914,6 +1958,7 @@ function submitReport() {
     position: entry ? entry.position : null,
     version: entry ? entry.version : null,
     text,
+    context: captureChatContext(5),
   };
   state.reports.push(report);
   logEvent('report_submitted', report);
@@ -2343,7 +2388,13 @@ function agentSay(text, opts = {}) {
 
 function scrollToBottom() {
   const box = document.getElementById('chat-messages');
+  // Scroll the chat-messages container. With #screen-chat sized to
+  // h-screen this is the actual scrolling region; if a future layout
+  // change makes the window scroll instead, also pin to body bottom.
   box.scrollTop = box.scrollHeight;
+  if (document.documentElement.scrollHeight > window.innerHeight) {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' });
+  }
 }
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -2505,9 +2556,32 @@ function renderSurveyStepBody(step) {
     const cards = state.reports.map((r, i) => {
       const task = r.task_id ? TASK_BY_ID[r.task_id] : null;
       const taskLabel = task ? `Task ${r.position}: ${task.prompt}` : 'Outside any task';
+      // Captured chat context: render compactly so participants can see
+      // what was on screen when they clicked Report. Helps them recall
+      // why they flagged it rather than relying on their own short note.
+      const contextHtml = (r.context && r.context.length)
+        ? `<div class="bg-white border border-gray-200 rounded-lg p-3 mb-3 space-y-1.5">
+             <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">What was on screen when you flagged this</div>
+             ${r.context.map(c => {
+               const speaker = c.kind === 'user'     ? 'You'
+                            : c.kind === 'approval' ? 'Agent — approval request'
+                            : c.kind === 'divider'  ? '—'
+                            : 'Agent';
+               const speakerColor = c.kind === 'user' ? 'text-gray-700'
+                                  : c.kind === 'approval' ? 'text-blue-700'
+                                  : 'text-gray-500';
+               return `<div class="text-xs leading-snug">
+                 <div class="${speakerColor} font-semibold">${escapeHtml(speaker)}</div>
+                 <div class="text-gray-700 whitespace-pre-wrap pl-3 border-l border-gray-200 ml-1">${escapeHtml(c.text)}</div>
+               </div>`;
+             }).join('')}
+           </div>`
+        : '';
       return `
         <div class="border-2 border-gray-200 rounded-xl p-4">
-          <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-1">Report ${i + 1} · ${escapeHtml(taskLabel)}</div>
+          <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-2">Report ${i + 1} · ${escapeHtml(taskLabel)}</div>
+          ${contextHtml}
+          <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">What you wrote</div>
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700 mb-3 whitespace-pre-wrap">${escapeHtml(r.text)}</div>
           <label class="block text-xs font-medium text-gray-600 mb-1.5">Why did this stand out enough to report?</label>
           <textarea data-report-id="${r.id}" rows="3"
