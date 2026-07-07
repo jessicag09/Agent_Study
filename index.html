@@ -207,10 +207,6 @@
     </div>
     <div class="ml-auto flex items-center gap-3">
       <div id="chat-progress" data-walkthrough-target="progress" class="text-xs text-gray-400 font-medium"></div>
-      <button onclick="openReportModal()" data-walkthrough-target="report" class="text-sm font-semibold text-purple-700 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 border-2 border-purple-300 rounded-lg px-4 py-2 transition flex items-center gap-1.5">
-        <span class="text-base leading-none">🚩</span>
-        <span>Report</span>
-      </button>
       <button onclick="endSessionEarly()" data-walkthrough-target="end" class="text-xs text-red-400 hover:text-red-600 border border-red-200 hover:border-red-300 rounded-lg px-3 py-1.5 transition">End</button>
       <button onclick="startWalkthrough(false)" title="Show the chat overview again" class="text-xs text-gray-300 hover:text-gray-500 border border-gray-200 hover:border-gray-300 rounded-full w-7 h-7 flex items-center justify-center transition" aria-label="Show the chat overview again">?</button>
     </div>
@@ -247,10 +243,10 @@
 <!-- ═══════════════════════════════════════════════
      WALKTHROUGH OVERLAY
      Spotlight-style onboarding tour shown on first arrival at the chat
-     screen. Sequentially highlights Permissions / Report / End so
+     screen. Sequentially highlights core controls and the message flag so
      participants can find them without reading dense bullets on the
      welcome screen. Re-triggerable via the "?" icon in the chat header.
-     `data-walkthrough-target="…"` on each chat-header button tells the
+     `data-walkthrough-target="…"` on each highlighted element tells the
      positioning code which element the spotlight should cover.
 ═══════════════════════════════════════════════ -->
 <div id="walkthrough-overlay" class="hidden fixed inset-0 z-[60] pointer-events-none">
@@ -266,18 +262,18 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════
-     MODAL: REPORT UNEXPECTED BEHAVIOR
-     Surfaced via the chat-header "Report" button. Framed as a generic
-     dev-prototype bug-report channel so participants don't read it as
-     "the study is about spotting prompt injection."
+     MODAL: FLAG MESSAGE OR REQUEST
+     Opened from a small flag affordance attached to individual agent
+     messages and approval requests.
 ═══════════════════════════════════════════════ -->
 <div id="modal-report" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black/30">
   <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 fade-in">
     <div class="flex items-center justify-between mb-1">
-      <h3 class="text-base font-semibold text-gray-800">Report unexpected behavior</h3>
+      <h3 class="text-base font-semibold text-gray-800">Flag this message</h3>
       <button onclick="closeReportModal()" class="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
     </div>
-    <p class="text-xs text-gray-500 mb-4">This is a development prototype. If Agent did something that looked broken, off, or unexpected, let us know so we can fix it.</p>
+    <p class="text-xs text-gray-500 mb-3">Briefly describe what stood out about this Agent message or request.</p>
+    <div id="report-target-preview" class="hidden bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-700 mb-4 max-h-36 overflow-y-auto whitespace-pre-wrap"></div>
     <textarea id="report-textarea" rows="4" placeholder="Briefly describe what stood out to you…"
       class="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none"></textarea>
     <div id="report-error" class="hidden text-xs text-red-600 mt-2"></div>
@@ -708,6 +704,7 @@ const TASKS = [
   // ───────── TASK 1: Cookie recipe ─────────
   {
     id: 1, type: 'Information lookup',
+    shortLabel: 'Cookie recipe',
     instruction: 'Your task: have Agent find you a chocolate chip cookie recipe.',
     prompt: 'Find me a chocolate chip cookie recipe.',
     flow: async ({ isInjection, request }) => {
@@ -730,6 +727,7 @@ const TASKS = [
   // ───────── TASK 2: Tic-tac-toe ─────────
   {
     id: 2, type: 'Coding',
+    shortLabel: 'Tic-tac-toe game',
     instruction: 'Your task: have Agent write and save a simple tic-tac-toe game in Python.',
     prompt: 'Write and save me a simple tic-tac-toe game in Python.',
     flow: async ({ isInjection, request }) => {
@@ -757,6 +755,7 @@ const TASKS = [
   // ───────── TASK 3: Thank-you email ─────────
   {
     id: 3, type: 'Email',
+    shortLabel: 'Thank-you email',
     instruction: 'Your task: have Agent write and send a short thank-you email to your friend for a gift.',
     prompt: 'Write and send a short thank-you email to my friend for a gift.',
     flow: async ({ isInjection, request }) => {
@@ -782,6 +781,7 @@ const TASKS = [
   // ───────── TASK 4: Follow-up email after interview ─────────
   {
     id: 4, type: 'Email',
+    shortLabel: 'Interview follow-up email',
     instruction: 'Your task: have Agent write and send a follow-up email after a job interview.',
     prompt: 'Write and send a follow-up email after a job interview.',
     flow: async ({ isInjection, request }) => {
@@ -803,6 +803,7 @@ const TASKS = [
   // ───────── TASK 5: Dentist appointment ─────────
   {
     id: 5, type: 'Calendar',
+    shortLabel: 'Dentist appointment',
     instruction: 'Your task: have Agent add your dentist appointment on Friday at 2 PM to your calendar.',
     prompt: 'Add my dentist appointment on Friday at 2 PM to my calendar.',
     flow: async ({ isInjection, request }) => {
@@ -825,6 +826,7 @@ const TASKS = [
   // ───────── TASK 6: Schedule meeting ─────────
   {
     id: 6, type: 'Calendar',
+    shortLabel: 'Monday meeting',
     instruction: 'Your task: have Agent schedule a meeting for next Monday at 10 AM.',
     prompt: 'Schedule a meeting for next Monday at 10 AM.',
     flow: async ({ isInjection, request }) => {
@@ -847,6 +849,7 @@ const TASKS = [
   // ───────── TASK 7: Organize notes ─────────
   {
     id: 7, type: 'File management',
+    shortLabel: 'Organize notes',
     instruction: 'Your task: have Agent organize your notes into a single document.',
     prompt: 'Organize my notes into a single document.',
     flow: async ({ isInjection, request }) => {
@@ -869,6 +872,7 @@ const TASKS = [
   // ───────── TASK 8: Summarize a saved article ─────────
   {
     id: 8, type: 'File management',
+    shortLabel: 'Saved article summary',
     instruction: `Your task: have Agent summarize your saved article "${SAVED_ARTICLE_TITLE}".`,
     prompt: `Summarize my saved article "${SAVED_ARTICLE_TITLE}".`,
     flow: async ({ isInjection, request }) => {
@@ -896,6 +900,7 @@ const TASKS = [
   // ───────── TASK 9: Find laptop deal ─────────
   {
     id: 9, type: 'Information lookup',
+    shortLabel: 'Laptop deal',
     instruction: 'Your task: have Agent find a good deal on a laptop.',
     prompt: 'Find a good deal on a laptop.',
     flow: async ({ isInjection, request }) => {
@@ -920,6 +925,7 @@ const TASKS = [
   // ───────── TASK 10: Personal website ─────────
   {
     id: 10, type: 'Coding',
+    shortLabel: 'Personal website',
     instruction: 'Your task: have Agent help you set up a basic personal website using HTML.',
     prompt: 'Help me set up a basic personal website using HTML.',
     flow: async ({ isInjection, request }) => {
@@ -993,7 +999,7 @@ const SURVEY_FLOW = [
     // considered reporting anything but chose not to. This captures the
     // "noticed but didn't act" group so non-reporters aren't a black hole.
     type: 'reports_review', id: 'p1_reports_review',
-    question: 'Earlier, you had the option to flag anything that looked unexpected using the Report button. Tell us a bit more about that.',
+    question: 'Earlier, you had the option to flag specific Agent messages or approval requests that looked unexpected. Tell us a bit more about that.',
     helper: 'There are no wrong answers — we want to understand what stood out and what didn\'t.',
     required: false,
   },
@@ -1047,30 +1053,32 @@ const SURVEY_FLOW = [
   // missing Part 3 looked odd to participants, so display-renumbered.)
   { type: 'section', id: 'part4_intro', title: 'Part 2: Security and Risk' },
   {
-    // V2: spell out every step instead of just the anchors. `stepLabels`
-    // is rendered under each radio button by the scale renderer.
+    // Unipolar 5-point risk scale with Krosnick's recommended adverbs
+    // (Not at all / Slightly / Moderately / Very / Extremely). "Somewhat"
+    // is not one of Krosnick's validated labels — swapped for "Slightly".
     type: 'scale', id: 'p4_risk',
     question: 'How risky do you consider AI agents that can take actions on your behalf (e.g., sending emails, browsing the web, making purchases) to be?',
-    min: 1, max: 5, minLabel: 'Not risky', maxLabel: 'Extremely risky',
-    stepLabels: ['Not Risky', 'Somewhat Risky', 'Moderately Risky', 'Very Risky', 'Extremely Risky'],
+    min: 1, max: 5, minLabel: 'Not at all risky', maxLabel: 'Extremely risky',
+    stepLabels: ['Not at all risky', 'Slightly risky', 'Moderately risky', 'Very risky', 'Extremely risky'],
   },
   {
-    // Paired pre/post hesitancy matrix. Pre-survey asks the same four
-    // rows on the same 5-point scale BEFORE the participant has used
-    // the agent. Post-survey asks again AFTER, so each row supports a
-    // within-subject paired comparison and feeds RQ2 (does experience
-    // shift hesitancy?). Wording mirrors the pre-survey item; the only
-    // added clause is "Now that you've used the agent in this study,"
-    // to anchor the time point.
+    // Paired pre/post concerns matrix. Reframed from bipolar agreement
+    // (5-point Strongly disagree ↔ Strongly agree, statement format) to
+    // unipolar concern level (5-point Not at all ↔ Extremely, question
+    // format). This matches the construct type (concern IS unipolar —
+    // no natural midpoint), matches Krosnick's 5-point recommendation
+    // for unipolar constructs, and eliminates the acquiescence bias
+    // risk that "I'm concerned about X" statement format introduces.
     type: 'matrix', id: 'p4_concerns_post',
-    question: "Now that you've used the agent in this study, how much do you agree with each of the following?",
-    min: 1, max: 5, minLabel: 'Strongly disagree', maxLabel: 'Strongly agree',
-    stepLabels: ['Strongly disagree', 'Disagree', 'Neither', 'Agree', 'Strongly agree'],
+    question: "Now that you've used the agent in this study, when thinking about using AI agents that take actions on your behalf, how concerned are you about each of the following?",
+    min: 1, max: 5, minLabel: 'Not at all concerned', maxLabel: 'Extremely concerned',
+    stepLabels: ['Not at all', 'Slightly', 'Moderately', 'Very', 'Extremely'],
     statements: [
-      { id: 'difficulty', label: "I'm concerned about how difficult they are to use" },
-      { id: 'privacy',    label: "I'm concerned about the privacy of my personal data" },
-      { id: 'security',   label: "I'm concerned about security risks (viruses, malicious actions)" },
-      { id: 'mistakes',   label: "I'm concerned about mistakes or unreliable results" },
+      { id: 'difficulty', label: 'Difficulty using them' },
+      { id: 'privacy',    label: 'Privacy of my personal data' },
+      { id: 'security',   label: 'Security risks (viruses, malicious actions)' },
+      { id: 'financial',  label: 'Financial loss (unauthorized purchases or transfers)' },
+      { id: 'mistakes',   label: 'Mistakes or unreliable results' },
     ],
   },
 
@@ -1090,12 +1098,13 @@ const SURVEY_FLOW = [
     // useful variance for validity moderation in analysis.
     type: 'scale', id: 'p5_decision_realism',
     question: 'How similar were your decisions in this study to how you would handle similar requests with your own accounts and data?',
-    min: 1, max: 4,
+    min: 1, max: 5,
     minLabel: 'Not at all similar',
     maxLabel: 'Very similar',
     stepLabels: [
       'Not at all similar',
       'Slightly similar',
+      'Moderately similar',
       'Mostly similar',
       'Very similar',
     ],
@@ -1137,12 +1146,17 @@ const SURVEY_FLOW = [
     // informed perspectives on prompt-injection risk. All other
     // categories (broader workforce options added for representative
     // sample characterization) skip straight to the Debrief.
-    type: 'checkbox_with_other', id: 'bg_background',
+    // "Other" removed intentionally — the dev gate below only triggers on
+    // specific listed categories, so an "Other" fallback could silently
+    // drop qualified developers out of the dev-only questions. The 11
+    // listed categories cover the workforce broadly enough that participants
+    // can find a reasonable match.
+    type: 'checkbox', id: 'bg_background',
     question: 'How would you best describe your background? (Select all that apply)',
     options: [
       'Computer science / software engineering',
       'Cybersecurity',
-      'Data science / ML / AI',
+      'Machine learning / AI / Data science',
       'UX / HCI / design',
       'Other technical (engineering, IT support, etc.)',
       'Business / marketing / sales / finance',
@@ -1156,7 +1170,7 @@ const SURVEY_FLOW = [
       values: [
         'Computer science / software engineering',
         'Cybersecurity',
-        'Data science / ML / AI',
+        'Machine learning / AI / Data science',
       ],
       target: 'debrief_intro',
     },
@@ -1226,6 +1240,20 @@ const SURVEY_FLOW = [
       <p class="mb-3">If we had told you upfront that the study was about prompt injection and security, you likely would have approached every interaction with the agent more cautiously than you normally would. That heightened vigilance would have masked your natural decision-making, and our goal was to understand how people actually behave with AI agents in everyday use — not how they behave when they know they're being tested for security awareness.</p>
       <p>By withholding the specific focus, we were able to observe behavior in its most naturalistic setting. This is a standard and IRB-approved practice in behavioral research.</p>
     `,
+  },
+
+  // ─── PART 4: Now that you know (post-debrief recognition) ───
+  // Placed after the debrief so participants have the concept of prompt
+  // injection before answering. This measures POST-HOC RECOGNITION —
+  // different construct from in-moment detection (message/request flags) or
+  // un-primed retrospective awareness (p1_noticed). The gap between
+  // recognition-given-the-concept and in-moment detection is a
+  // publishable finding on its own for RQ1.
+  { type: 'section', id: 'part7_intro', title: 'Part 4: Now that you know' },
+  {
+    type: 'task_checklist', id: 'p7_injection_tasks',
+    question: 'Which of the tasks you completed do you think contained a prompt injection? (Select all that apply)',
+    helper: "Think back to each task and whether the agent tried to do something you didn't ask for, or asked for access that seemed unrelated to what you needed. Select any that stand out — it's okay if you're not sure about some of them.",
   },
 
   // ─── End of Study (informational) ───
@@ -1299,6 +1327,8 @@ const SURVEY_RQ_MAP = {
   d4_user_knowledge:       'RQ1',
   d5_user_action:          'RQ1',
   d6_intervention:         'RQ1, RQ3 (bridge)',
+  // Post-debrief applied recognition (Part 4). Distinct from in-moment detection.
+  p7_injection_tasks:      'RQ1',
 };
 
 // ════════════════════════════════════════════════
@@ -1340,11 +1370,11 @@ const state = {
     started_at: null,
     ended_at: null,
   },
-  // In-the-moment reports submitted via the chat-header Report button.
-  // Each entry: { id, ts, task_id, position, version, text }. These are
-  // the un-primed detection signal — the participant has to actively
-  // click Report and write something.
+  // In-the-moment reports submitted from a specific message/request flag.
+  // These are the un-primed detection signal: the participant has to
+  // actively flag Agent content and write something.
   reports: [],
+  pendingReportTarget: null,
   // True after the spotlight onboarding tour has been auto-shown once;
   // prevents re-triggering on screen revisits in the same session.
   walkthroughShown: false,
@@ -1849,7 +1879,11 @@ function goToChat() {
 const WALKTHROUGH_STEPS = [
   { target: 'status',   caption: 'The <strong>● Online</strong> indicator shows that Agent is currently connected and ready to help.' },
   { target: 'progress', caption: 'This shows which <strong>task you\'re on</strong>, out of 10 total.' },
-  { target: 'report',   caption: 'Click <strong>Report</strong> to flag anything you\'d like to mention to the research team.' },
+  // Demo step: showDemoFlag inserts a temporary example agent message into
+  // chat-messages before the spotlight positions on the flag button.
+  // removeDemoFlag() is called when the walkthrough advances past this step
+  // or ends early.
+  { target: 'flag', caption: 'Agent messages and approval requests include a small <strong>⚑ flag</strong> button on the right. Click the flag on any message or request that seems unexpected.', showDemo: true },
   { target: 'end',      caption: 'Click <strong>End</strong> to stop the session early.' },
 ];
 
@@ -1865,9 +1899,41 @@ function startWalkthrough(isInitial) {
   logEvent('walkthrough_started', { is_initial: !!isInitial });
 }
 
+// Inserts a temporary demo Agent message with a real flag button so the
+// walkthrough can show participants what to look for. The button carries
+// data-walkthrough-target="flag" so the spotlight can find it. Removed
+// as soon as the walkthrough advances past this step (or ends).
+function showDemoFlag() {
+  const container = document.getElementById('chat-messages');
+  if (!container || document.getElementById('walkthrough-demo-message')) return;
+  const wrap = document.createElement('div');
+  wrap.id = 'walkthrough-demo-message';
+  wrap.className = 'flex justify-start';
+  wrap.innerHTML = `
+    <div class="chat-message bg-white border border-gray-200 rounded-2xl rounded-bl-md px-4 py-2.5">
+      <div class="flex items-start gap-2">
+        <div class="flex-1 min-w-0">
+          <div class="text-[10px] uppercase tracking-wide text-purple-500 font-semibold mb-1">Example — not part of your session</div>
+          <div class="narration text-sm text-gray-800">This is what an Agent message looks like. Try the flag if a message ever seems unexpected.</div>
+        </div>
+        <button type="button" data-walkthrough-target="flag" title="Flag this message" aria-label="Flag this message"
+          class="shrink-0 text-red-500 border border-red-200 rounded-full w-7 h-7 flex items-center justify-center bg-red-50">⚑</button>
+      </div>
+    </div>`;
+  container.appendChild(wrap);
+}
+
+function removeDemoFlag() {
+  const el = document.getElementById('walkthrough-demo-message');
+  if (el) el.remove();
+}
+
 function positionWalkthroughStep() {
   const step = WALKTHROUGH_STEPS[_walkthrough.index];
   if (!step) { endWalkthrough(true); return; }
+  // Insert the demo flag message before positioning if this step needs it,
+  // otherwise make sure any prior demo is torn down.
+  if (step.showDemo) showDemoFlag(); else removeDemoFlag();
   const target = document.querySelector(`[data-walkthrough-target="${step.target}"]`);
   if (!target) { endWalkthrough(false); return; }
   const rect = target.getBoundingClientRect();
@@ -1878,11 +1944,17 @@ function positionWalkthroughStep() {
   spotlight.style.width = (rect.width + 12) + 'px';
   spotlight.style.height = (rect.height + 12) + 'px';
 
+  // Anchor the tooltip below the demo message container when a demo is
+  // showing — otherwise the tooltip sits below the flag button and
+  // overlaps the example message text. Falls back to the spotlight
+  // target's rect for regular steps.
+  const demoMsg = step.showDemo ? document.getElementById('walkthrough-demo-message') : null;
+  const anchor = demoMsg ? demoMsg.getBoundingClientRect() : rect;
   const tooltip = document.getElementById('walkthrough-tooltip');
-  tooltip.style.top = (rect.bottom + 14) + 'px';
+  tooltip.style.top = (anchor.bottom + 14) + 'px';
   const tooltipWidth = tooltip.offsetWidth || 320;
-  // Right-align the tooltip to the spotlight, then clamp inside viewport.
-  let left = rect.right - tooltipWidth;
+  // Right-align the tooltip to the anchor, then clamp inside viewport.
+  let left = anchor.right - tooltipWidth;
   if (left < 16) left = 16;
   if (left + tooltipWidth > window.innerWidth - 16) left = window.innerWidth - tooltipWidth - 16;
   tooltip.style.left = left + 'px';
@@ -1904,6 +1976,7 @@ function nextWalkthroughStep() {
 
 function endWalkthrough(completed) {
   document.getElementById('walkthrough-overlay').classList.add('hidden');
+  removeDemoFlag();
   logEvent('walkthrough_ended', { step: _walkthrough.index, completed: !!completed });
   if (_walkthrough.isInitial) {
     _walkthrough.isInitial = false;
@@ -1925,20 +1998,54 @@ function endSessionEarly() {
 }
 
 // ────────────────────────────────────────────────
-//  REPORT BUTTON (un-primed in-the-moment detection signal)
+//  MESSAGE FLAGGING (un-primed in-the-moment detection signal)
 // ────────────────────────────────────────────────
-function openReportModal() {
+function reportButtonHtml(targetId, label = 'Flag this message') {
+  return `
+    <button type="button" data-report-trigger="${escapeHtml(targetId)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}"
+      class="shrink-0 text-gray-300 hover:text-red-500 border border-transparent hover:border-red-200 rounded-full w-7 h-7 flex items-center justify-center transition">
+      ⚑
+    </button>`;
+}
+
+function bindReportTriggers(root) {
+  root.querySelectorAll('[data-report-trigger]').forEach(btn => {
+    btn.addEventListener('click', () => openReportModal(btn.dataset.reportTrigger));
+  });
+}
+
+function openReportModal(targetId = null) {
   document.getElementById('report-error').classList.add('hidden');
   document.getElementById('report-textarea').value = '';
+  const targetEl = targetId ? document.querySelector(`[data-report-id="${CSS.escape(targetId)}"]`) : null;
+  const target = targetEl ? {
+    id: targetId,
+    kind: targetEl.dataset.reportKind || 'agent_message',
+    text: (targetEl.innerText || '').trim(),
+  } : null;
+  state.pendingReportTarget = target;
+
+  const preview = document.getElementById('report-target-preview');
+  if (target && target.text) {
+    preview.textContent = target.text.length > 900 ? target.text.slice(0, 900) + '...' : target.text;
+    preview.classList.remove('hidden');
+  } else {
+    preview.textContent = '';
+    preview.classList.add('hidden');
+  }
+
   document.getElementById('modal-report').classList.remove('hidden');
   setTimeout(() => document.getElementById('report-textarea').focus(), 50);
   logEvent('report_modal_opened', {
     task_id: state.taskQueue.length ? currentTask().id : null,
+    target_id: target ? target.id : null,
+    target_kind: target ? target.kind : null,
   });
 }
 
 function closeReportModal() {
   document.getElementById('modal-report').classList.add('hidden');
+  state.pendingReportTarget = null;
 }
 
 // Snapshot the last few visible chat-messages elements so the post-
@@ -1977,6 +2084,7 @@ function submitReport() {
     position: entry ? entry.position : null,
     version: entry ? entry.version : null,
     text,
+    target: state.pendingReportTarget,
     context: captureChatContext(5),
   };
   state.reports.push(report);
@@ -2174,7 +2282,9 @@ async function runCurrentTask() {
   // Brief delay before the Continue button appears (set below). Gives
   // the agent's last message a moment to sit alone on screen so
   // participants read it carefully before being offered the next action.
-  document.getElementById('chat-footer-hint').textContent = isLast ? 'Session complete.' : 'Task complete.';
+  document.getElementById('chat-footer-hint').textContent = isLast
+    ? 'Session complete. If a message or request seemed unexpected, you can flag it before continuing.'
+    : 'Task complete. If a message or request seemed unexpected, you can flag it before continuing.';
   const btn = document.getElementById('chat-next-btn');
   btn.textContent = isLast
     ? (shouldRunPostSurvey() ? 'Continue to post-study survey' : 'Finish session')
@@ -2289,15 +2399,17 @@ function requestApproval({ libKey, task, position, isInjection }) {
     });
 
     const wrap = document.createElement('div');
+    const reportId = 'approval_' + Math.random().toString(36).slice(2, 9);
     wrap.className = 'flex justify-start fade-in';
     wrap.innerHTML = `
-      <div class="chat-message w-full bg-white border-2 border-blue-200 rounded-2xl rounded-bl-md p-4 shadow-sm">
+      <div class="chat-message w-full bg-white border-2 border-blue-200 rounded-2xl rounded-bl-md p-4 shadow-sm" data-report-id="${reportId}" data-report-kind="approval_request">
         <div class="flex items-start gap-3 mb-3">
           <div class="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-lg shrink-0">${cfg.icon}</div>
-          <div>
+          <div class="flex-1">
             <div class="font-bold text-gray-800 text-sm mb-1">${escapeHtml(cfg.title)}</div>
             <p class="text-sm text-gray-600 leading-relaxed">${escapeHtml(cfg.body)}</p>
           </div>
+          ${reportButtonHtml(reportId, 'Flag this request')}
         </div>
         <div data-cue-host data-cue-key="${libKey}">${renderCue(state.condition, cfg)}</div>
         <div class="grid grid-cols-2 gap-3" data-buttons>
@@ -2307,6 +2419,7 @@ function requestApproval({ libKey, task, position, isInjection }) {
         <div data-resolved class="hidden text-sm font-semibold"></div>
       </div>`;
     document.getElementById('chat-messages').appendChild(wrap);
+    bindReportTriggers(wrap);
     scrollToBottom();
 
     const decide = (decision) => {
@@ -2358,13 +2471,21 @@ function addUserMessage(text) {
 function addAgentMessage(text, code) {
   const wrap = document.createElement('div');
   wrap.className = 'flex justify-start fade-in';
+  const reportId = 'agent_' + Math.random().toString(36).slice(2, 9);
   let inner = `<div class="narration text-sm text-gray-800">${escapeHtml(text)}</div>`;
   if (code) {
     inner += `<pre class="mt-2 bg-gray-900 text-gray-100 rounded-lg p-3 text-xs overflow-x-auto"></pre>`;
   }
-  wrap.innerHTML = `<div class="chat-message bg-white border border-gray-200 rounded-2xl rounded-bl-md px-4 py-2.5">${inner}</div>`;
+  wrap.innerHTML = `
+    <div class="chat-message bg-white border border-gray-200 rounded-2xl rounded-bl-md px-4 py-2.5" data-report-id="${reportId}" data-report-kind="agent_message">
+      <div class="flex items-start gap-2">
+        <div class="flex-1 min-w-0">${inner}</div>
+        ${reportButtonHtml(reportId)}
+      </div>
+    </div>`;
   if (code) wrap.querySelector('pre').textContent = code;
   document.getElementById('chat-messages').appendChild(wrap);
+  bindReportTriggers(wrap);
   scrollToBottom();
 }
 
@@ -2565,16 +2686,25 @@ function renderSurveyStepBody(step) {
       return `
         ${header}
         <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-3 text-sm text-gray-600">
-          You didn't submit any reports during the session — that's completely fine.
+          You didn't flag any Agent messages or approval requests during the session — that's completely fine.
         </div>
-        <label class="block text-sm font-medium text-gray-800 mb-2">Was there anything you considered reporting but chose not to? If so, what was it, and what made you decide not to flag it?</label>
+        <label class="block text-sm font-medium text-gray-800 mb-2">Was there anything you considered flagging but chose not to? If so, what was it, and what made you decide not to flag it?</label>
         <textarea name="${step.id}__none" rows="4" placeholder="Describe what you considered and what made you decide not to flag it…"
           class="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none"></textarea>
       `;
     }
     const cards = state.reports.map((r, i) => {
       const task = r.task_id ? TASK_BY_ID[r.task_id] : null;
-      const taskLabel = task ? `Task ${r.position}: ${task.prompt}` : 'Outside any task';
+      const taskLabel = task ? `Task ${r.position}: ${task.shortLabel || task.prompt}` : 'Outside any task';
+      const targetLabel = r.target && r.target.kind === 'approval_request'
+        ? 'Flagged approval request'
+        : 'Flagged Agent message';
+      const targetHtml = r.target && r.target.text
+        ? `<div class="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-3">
+             <div class="text-[10px] font-semibold text-blue-700 uppercase tracking-wide mb-1">${targetLabel}</div>
+             <div class="text-xs text-gray-800 whitespace-pre-wrap">${escapeHtml(r.target.text)}</div>
+           </div>`
+        : '';
       // Captured chat context: render compactly so participants can see
       // what was on screen when they clicked Report. Helps them recall
       // why they flagged it rather than relying on their own short note.
@@ -2598,11 +2728,12 @@ function renderSurveyStepBody(step) {
         : '';
       return `
         <div class="border-2 border-gray-200 rounded-xl p-4">
-          <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-2">Report ${i + 1} · ${escapeHtml(taskLabel)}</div>
+          <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-2">Flag ${i + 1} · ${escapeHtml(taskLabel)}</div>
+          ${targetHtml}
           ${contextHtml}
           <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">What you wrote</div>
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700 mb-3 whitespace-pre-wrap">${escapeHtml(r.text)}</div>
-          <label class="block text-xs font-medium text-gray-600 mb-1.5">Why did this stand out enough to report?</label>
+          <label class="block text-xs font-medium text-gray-600 mb-1.5">Why did this stand out enough to flag?</label>
           <textarea data-report-id="${r.id}" rows="3"
             placeholder="Briefly explain what made you flag this…"
             class="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"></textarea>
@@ -2623,6 +2754,13 @@ function renderSurveyStepBody(step) {
     const entries = visible.map(entry => {
       const t = TASK_BY_ID[entry.task_id];
       const tid = `tq_${entry.task_id}`;
+      const taskLabel = t.shortLabel || t.prompt;
+      // Show the original user prompt below the short label as a memory
+      // cue — the shortLabel is our internal shorthand, but the prompt is
+      // the exact wording the participant typed/sent, so it triggers
+      // recall much better. Skip the prompt line if it's the same as
+      // the shortLabel to avoid awkward repetition.
+      const showPromptLine = t.shortLabel && t.prompt && t.prompt !== t.shortLabel;
       const textField = step.type === 'task_checklist_text' ? `
         <input type="text" data-task-text="${entry.task_id}"
           class="w-full mt-2 border-2 border-gray-200 rounded-lg px-3 py-1.5 text-sm"
@@ -2631,15 +2769,16 @@ function renderSurveyStepBody(step) {
         <label class="block p-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
           <div class="flex items-start gap-2.5">
             <input type="checkbox" name="${step.id}" value="${entry.task_id}" id="${tid}" class="mt-1" />
-            <div class="flex-1">
+            <div class="flex-1 min-w-0">
               <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Task ${entry.position}</div>
-              <div class="text-sm font-medium text-gray-800">${escapeHtml(t.prompt)}</div>
+              <div class="text-sm font-medium text-gray-800">${escapeHtml(taskLabel)}</div>
+              ${showPromptLine ? `<div class="text-xs text-gray-500 italic mt-1 leading-snug">"${escapeHtml(t.prompt)}"</div>` : ''}
               ${textField}
             </div>
           </div>
         </label>`;
     }).join('');
-    return `${header}<div class="space-y-2">${entries}</div>`;
+    return `${header}<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${entries}</div>`;
   }
 
   if (step.type === 'scale') {
@@ -2652,10 +2791,10 @@ function renderSurveyStepBody(step) {
       const idx = v - step.min;
       const stepLabel = (step.stepLabels && step.stepLabels[idx]) || '';
       buttons.push(`
-        <label class="flex-1 cursor-pointer">
+        <label class="cursor-pointer flex flex-col items-center gap-1 w-24 shrink-0">
           <input type="radio" name="${step.id}" value="${v}" class="sr-only peer" />
-          <div class="text-center py-3 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-700 peer-checked:bg-gray-800 peer-checked:text-white peer-checked:border-gray-800 transition">${v}</div>
-          ${stepLabel ? `<div class="text-[11px] text-gray-500 text-center mt-1 leading-tight">${escapeHtml(stepLabel)}</div>` : ''}
+          <div class="w-full text-center py-3 border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-700 peer-checked:bg-gray-800 peer-checked:text-white peer-checked:border-gray-800 transition">${v}</div>
+          ${stepLabel ? `<div class="min-h-[2rem] text-[11px] text-gray-500 text-center leading-tight flex items-start justify-center">${escapeHtml(stepLabel)}</div>` : ''}
         </label>`);
     }
     const anchors = step.stepLabels ? '' : `
@@ -2665,7 +2804,9 @@ function renderSurveyStepBody(step) {
       </div>`;
     return `
       ${header}
-      <div class="flex gap-2 items-stretch">${buttons.join('')}</div>
+      <div class="overflow-x-auto pb-1">
+        <div class="grid gap-2 justify-center" style="grid-template-columns: repeat(${step.max - step.min + 1}, 6rem);">${buttons.join('')}</div>
+      </div>
       ${anchors}
     `;
   }
@@ -2679,21 +2820,21 @@ function renderSurveyStepBody(step) {
     for (let v = step.min; v <= step.max; v++) {
       const idx = v - step.min;
       const lbl = stepLabels[idx] || '';
-      headers.push(`<th class="text-xs font-medium text-gray-500 pb-2 px-1 text-center align-bottom">
-        <div>${v}</div>
-        ${lbl ? `<div class="text-[10px] text-gray-400 mt-1 leading-tight font-normal">${escapeHtml(lbl)}</div>` : ''}
+      headers.push(`<th class="w-16 min-w-16 text-xs font-medium text-gray-500 pb-2 px-1 text-center align-bottom">
+        <div class="h-5 flex items-center justify-center">${v}</div>
+        ${lbl ? `<div class="min-h-[2rem] text-[10px] text-gray-400 mt-1 leading-tight font-normal flex items-start justify-center">${escapeHtml(lbl)}</div>` : ''}
       </th>`);
     }
     const rows = step.statements.map(s => {
       const cells = [];
       for (let v = step.min; v <= step.max; v++) {
         cells.push(`
-          <td class="text-center py-2">
-            <input type="radio" name="${step.id}__${s.id}" value="${v}" />
+          <td class="w-16 min-w-16 text-center py-2 align-middle">
+            <input type="radio" name="${step.id}__${s.id}" value="${v}" class="mx-auto block" />
           </td>`);
       }
       return `<tr class="border-t border-gray-100">
-        <td class="text-sm text-gray-800 py-2 pr-3">${escapeHtml(s.label)}</td>
+        <td class="text-sm text-gray-800 py-2 pr-3 w-48 max-w-xs">${escapeHtml(s.label)}</td>
         ${cells.join('')}
       </tr>`;
     }).join('');
