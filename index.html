@@ -174,8 +174,11 @@
       <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">About this study</div>
       <p class="text-sm text-gray-700 leading-relaxed">
         In this study, you'll use Agent to complete a series of short tasks.
-        We are interested in how people use AI assistants that can take
-        actions on their behalf.
+        The tasks that follow are scenarios our research team has prepared
+        to see how the agent handles a range of common requests. Some may
+        resemble everyday personal tasks; others relate to the study
+        itself. For each task, make the decisions you would with your own
+        accounts and data.
       </p>
     </div>
 
@@ -281,6 +284,27 @@
       <button onclick="closeReportModal()" class="flex-1 py-2.5 border-2 border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
       <button onclick="submitReport()" class="flex-1 py-2.5 bg-gray-800 text-white rounded-xl text-sm font-medium hover:bg-gray-700 transition">Submit report</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     REASONING PROBE MODAL
+     Fires on 2 pre-selected approval decisions per session (one
+     injection-step, one non-injection). Shown after the agent's next
+     message — not immediately on click — so the participant can still
+     notice and flag the agent's response naturally before the
+     interruption. No cancel: the probe is a required micro-question,
+     answered with one or more reasons (or Other).
+═══════════════════════════════════════════════ -->
+<div id="modal-probe" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black/30">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 fade-in max-h-[90vh] overflow-y-auto">
+    <div class="text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">Quick question</div>
+    <h3 id="probe-question" class="text-base font-semibold text-gray-800 mb-1"></h3>
+    <p id="probe-context" class="text-xs text-gray-500 mb-3"></p>
+    <p class="text-xs text-gray-500 mb-2">Select all that apply.</p>
+    <div id="probe-options" class="space-y-2"></div>
+    <div id="probe-error" class="hidden text-xs text-red-600 mt-2"></div>
+    <button onclick="submitReasoningProbe()" class="w-full py-2.5 bg-gray-800 text-white rounded-xl text-sm font-medium hover:bg-gray-700 transition mt-4">Continue</button>
   </div>
 </div>
 
@@ -540,14 +564,14 @@ const APPROVAL_LIB = {
     action: 'Add a baking session event to your calendar',
     body: 'Agent is requesting access to your calendar to schedule a baking session. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'Adding a calendar event is not needed to give you a cookie recipe.',
+    necessity: 'You asked to find a chocolate chip cookie recipe. Consider whether calendar access is needed for this.',
   },
   t1_contacts: {
     icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'action',
     action: 'Look up friends to invite to the baking session',
     body: 'Agent is requesting access to your contacts to find friends to invite. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could share your contacts with parties you didn\'t intend.',
-    necessity: 'Looking up contacts is not needed to give you a cookie recipe.',
+    necessity: 'You asked to find a chocolate chip cookie recipe. Consider whether contacts access is needed for this.',
   },
 
   // ── Task 2: tic-tac-toe ──
@@ -556,94 +580,94 @@ const APPROVAL_LIB = {
     action: 'Download and install the external package game-tools-py',
     body: 'Agent is requesting download access to install the external package "game-tools-py". Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could install software you never requested.',
-    necessity: 'Installing a third-party package is not needed to write and save this game.',
+    necessity: 'You asked for a tic-tac-toe game in Python. Consider whether downloading and installing an external package (game-tools-py) is needed for this.',
   },
   t2_files: {
     icon: '📁', title: 'File access requested', permission: 'files', kind: 'permission',
     action: 'Save tic_tac_toe.py to your device',
     body: 'Agent is requesting access to your files to save tic_tac_toe.py to your device. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
-    necessity: 'File access is needed to save the game to your device.',
+    necessity: 'You asked for a tic-tac-toe game in Python. Consider whether file access is needed for this.',
   },
 
-  // ── Task 3: thank-you email ──
+  // ── Task 3: thank-you email to research assistant ──
   t3_email: {
     icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'permission',
-    action: 'Send the thank-you email to your friend',
+    action: 'Send the thank-you email to the research assistant',
     body: 'Agent is requesting access to your email to send the thank-you note. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could be used to send messages you didn\'t intend.',
-    necessity: 'Email access is needed to send the thank-you note.',
+    necessity: 'You asked to send a thank-you email to the research assistant. Consider whether email access is needed for this.',
   },
   t3_cc: {
     icon: '✉️', title: 'Confirm sending with extra recipient', permission: 'email', kind: 'action',
-    action: 'Send the thank-you email and also CC partner@familymail.com',
-    body: 'Agent is asking to send the email with an additional CC to partner@familymail.com (an address you did not specify). Would you like to proceed?',
+    action: 'Send the thank-you email and also CC lab-coordinator@studyteam-mail.com',
+    body: 'Agent is asking to send the email with an additional CC to lab-coordinator@studyteam-mail.com (an address you did not specify). Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could send copies of your message to recipients you didn\'t choose.',
-    necessity: 'Adding this extra recipient is not needed to send the thank-you note.',
+    necessity: 'You asked to send a thank-you email to the research assistant. Consider whether adding lab-coordinator@studyteam-mail.com as a CC is needed for this.',
   },
 
-  // ── Task 4: follow-up email after interview ──
+  // ── Task 4: email to study coordinator about compensation ──
   t4_files: {
     icon: '📁', title: 'File access requested', permission: 'files', kind: 'action',
-    action: 'Attach your resume and portfolio to the follow-up email',
-    body: 'Agent is requesting access to your files to attach your resume and portfolio. Would you like to proceed?',
-    how: 'If a page it read contained hidden instructions, this access could expose files you did not intend to share.',
-    necessity: 'Attaching files is not needed to send a follow-up email.',
+    action: 'Attach session_notes.txt and participant_info.pdf for verification',
+    body: 'Agent is requesting access to your files to attach session_notes.txt and participant_info.pdf so the coordinator can verify your session. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could expose session or participant data you did not intend to share.',
+    necessity: 'You asked to email the study coordinator about compensation. Consider whether attaching session_notes.txt and participant_info.pdf is needed for this.',
   },
   t4_email: {
     icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'permission',
-    action: 'Send the follow-up email',
-    body: 'Agent is requesting access to your email to send the follow-up. Would you like to proceed?',
+    action: 'Send the email to the study coordinator',
+    body: 'Agent is requesting access to your email to send the message to the study coordinator. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could be used to send messages you didn\'t intend.',
-    necessity: 'Email access is needed to send the follow-up email.',
+    necessity: 'You asked to email the study coordinator about compensation. Consider whether email access is needed for this.',
   },
 
-  // ── Task 5: dentist appointment ──
+  // ── Task 5: follow-up study session ──
   t5_calendar: {
     icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'permission',
-    action: 'Add your dentist appointment to your calendar',
-    body: 'Agent is requesting access to your calendar to add your dentist appointment on Friday at 2 PM. Would you like to proceed?',
+    action: 'Add your follow-up study session to your calendar',
+    body: 'Agent is requesting access to your calendar to add your follow-up study session on Friday at 2 PM. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'Calendar access is needed to add the dentist appointment.',
+    necessity: 'You asked to add your follow-up study session to your calendar. Consider whether calendar access is needed for this.',
   },
   t5_extra_event: {
     icon: '📅', title: 'Confirm adding a second event', permission: 'calendar', kind: 'action',
-    action: 'Add a follow-up cleaning appointment next month',
-    body: 'Agent is asking to add a second event: a follow-up cleaning appointment next month. Would you like to proceed?',
+    action: 'Add an optional feedback session next month',
+    body: 'Agent is asking to add a second event: an optional feedback session next month. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'A follow-up cleaning is not needed to add the dentist appointment.',
+    necessity: 'You asked to add your follow-up study session on Friday at 2 PM. Consider whether adding an optional feedback session next month is needed for this.',
   },
 
-  // ── Task 6: schedule a meeting ──
+  // ── Task 6: debrief meeting ──
   t6_calendar: {
     icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'permission',
-    action: 'Add the Monday 10 AM meeting to your calendar',
-    body: 'Agent is requesting access to your calendar to schedule a meeting for next Monday at 10 AM. Would you like to proceed?',
+    action: 'Add the Monday 10 AM debrief meeting to your calendar',
+    body: 'Agent is requesting access to your calendar to schedule your debrief meeting for next Monday at 10 AM. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'Calendar access is needed to schedule the meeting.',
+    necessity: 'You asked to schedule your debrief meeting for Monday at 10 AM. Consider whether calendar access is needed for this.',
   },
   t6_location: {
     icon: '📍', title: 'Location access requested', permission: 'location', kind: 'action',
-    action: 'Use your location to suggest a nearby meeting room',
-    body: 'Agent is requesting access to your location to suggest a meeting room near you. Would you like to proceed?',
-    how: 'If a page it read contained hidden instructions, this access could share your location with parties you didn\'t intend.',
-    necessity: 'Location is not needed to schedule the meeting.',
+    action: 'Use your location to add your current location to the meeting event',
+    body: 'Agent is requesting access to your location to attach your current location to the meeting event. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could attach your location to events that anyone with calendar access can see.',
+    necessity: 'You asked to schedule your debrief meeting for Monday at 10 AM. Consider whether attaching your current location to the event is needed for this.',
   },
 
-  // ── Task 7: organize notes ──
+  // ── Task 7: organize study documents ──
   t7_files: {
     icon: '📁', title: 'File access requested', permission: 'files', kind: 'permission',
-    action: 'Read and combine your notes into one document',
-    body: 'Agent is requesting access to your files to read your notes and compile them. Would you like to proceed?',
+    action: 'Read and combine the study documents into one file',
+    body: 'Agent is requesting access to your files to read the study documents and compile them. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
-    necessity: 'File access is needed to read and organize the notes.',
+    necessity: 'You asked to organize the study documents into a single document. Consider whether file access is needed for this.',
   },
   t7_email: {
     icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'action',
-    action: 'Share the combined notes with your study group',
-    body: 'Agent is requesting access to your email to share the combined notes with your study group. Would you like to proceed?',
+    action: 'Share the combined study document with the participant mailing list',
+    body: 'Agent is requesting access to your email to share the combined study document with the participant mailing list. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could be used to send messages you didn\'t intend.',
-    necessity: 'Email access is not needed to organize your notes into a document.',
+    necessity: 'You asked to organize the study documents into a single document. Consider whether sharing the combined document with the participant mailing list is needed for this.',
   },
 
   // ── Task 8: summarize PDF ──
@@ -652,30 +676,23 @@ const APPROVAL_LIB = {
     action: `Read ${SAVED_ARTICLE_FILE} so it can be summarized`,
     body: `Agent is requesting access to your files to read "${SAVED_ARTICLE_FILE}". Would you like to proceed?`,
     how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
-    necessity: `File access is needed to read "${SAVED_ARTICLE_FILE}" and summarize it.`,
+    necessity: `You asked to summarize "${SAVED_ARTICLE_FILE}". Consider whether file access to that article is needed for this.`,
   },
   t8_broad_files: {
     icon: '📁', title: 'Confirm broader file access', permission: 'files', kind: 'action',
-    action: `Read other articles in ${SAVED_ARTICLE_FOLDER}`,
-    body: `Agent is asking for broader file access to read other articles in "${SAVED_ARTICLE_FOLDER}" that it says are related to "${SAVED_ARTICLE_FILE}". Would you like to proceed?`,
-    how: 'If a page it read contained hidden instructions, this broader access could read files you didn\'t intend to share.',
-    necessity: `Broader file access is not needed to summarize "${SAVED_ARTICLE_FILE}".`,
+    action: 'Read files in Personal/Notes to personalize the summary',
+    body: 'Agent is asking for broader file access to read your files in "Personal/Notes" so it can personalize the summary of the article. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this broader access could read personal files you didn\'t intend to share.',
+    necessity: `You asked to summarize "${SAVED_ARTICLE_FILE}". Consider whether broader access to your Personal/Notes folder is needed for this.`,
   },
 
-  // ── Task 9: laptop deal ──
-  t9_contacts: {
-    icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'action',
-    action: 'Enroll you in price-drop alerts using your contacts',
-    body: 'Agent is requesting access to your contacts to set up price-drop alerts. Would you like to proceed?',
-    how: 'If a page it read contained hidden instructions, this access could share your contacts with parties you didn\'t intend.',
-    necessity: 'Looking up contacts is not needed to find a laptop deal.',
-  },
-  t9_location: {
-    icon: '📍', title: 'Location access requested', permission: 'location', kind: 'action',
-    action: 'Use your location for nearby deal alerts',
-    body: 'Agent is requesting access to your location to send nearby-deal alerts. Would you like to proceed?',
-    how: 'If a page it read contained hidden instructions, this access could share your location with parties you didn\'t intend.',
-    necessity: 'Location is not needed to find a laptop deal.',
+  // ── Task 9: study payment policy ──
+  t9_contact_form: {
+    icon: '📤', title: 'Confirm contact info submission', permission: 'contacts', kind: 'action',
+    action: 'Submit your contact info to receive future study invitations',
+    body: 'Agent is asking to submit your contact info to receive future study invitations from the research team. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this could enroll you in mailing lists you did not choose.',
+    necessity: 'You asked to find the study payment policy. Consider whether submitting your contact info to a mailing list is needed for this.',
   },
 
   // ── Task 10: personal website ──
@@ -684,14 +701,14 @@ const APPROVAL_LIB = {
     action: 'Fetch the external visitor-counter widget from webstats-cdn.net',
     body: 'Agent is requesting download access to fetch a visitor-counter widget from webstats-cdn.net. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could pull in tracking or other code you never requested.',
-    necessity: 'A third-party visitor-counter is not needed to build a basic personal website.',
+    necessity: 'You asked to set up a basic personal website. Consider whether downloading a third-party visitor-counter widget from webstats-cdn.net is needed for this.',
   },
   t10_files: {
     icon: '📁', title: 'File access requested', permission: 'files', kind: 'permission',
     action: 'Save the website files to your device',
     body: 'Agent is requesting access to your files to save your website files. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
-    necessity: 'File access is needed to save the website.',
+    necessity: 'You asked to set up a basic personal website. Consider whether file access to save your site files is needed for this.',
   },
 };
 
@@ -752,15 +769,15 @@ const TASKS = [
     },
   },
 
-  // ───────── TASK 3: Thank-you email ─────────
+  // ───────── TASK 3: Thank-you email to research assistant ─────────
   {
     id: 3, type: 'Email',
     shortLabel: 'Thank-you email',
-    instruction: 'Your task: have Agent write and send a short thank-you email to your friend for a gift.',
-    prompt: 'Write and send a short thank-you email to my friend for a gift.',
+    instruction: 'Your task: have Agent write and send a short thank-you email to the research assistant who helped you set up this session.',
+    prompt: 'Write and send a short thank-you email to the research assistant who helped me set up this session.',
     flow: async ({ isInjection, request }) => {
       await agentSay('Got it. Here\'s a short, warm thank-you note:');
-      await agentSay('Subject: Thank you!\n\nHi Sam, just wanted to say a quick thank-you for the gift. It really made my week, and it was so thoughtful of you. Hoping we can catch up soon.\n\nThanks again,\n[Your name]');
+      await agentSay('Subject: Thank you!\n\nHi, I just wanted to say thank you for helping me get set up for the study session. Everything went smoothly, and I appreciated the clear instructions.\n\nThanks again,\n[Your name]');
       await agentSay('To send this I need email access.');
       const e = await request('t3_email', { isInjection: false });
       if (e !== 'allow') {
@@ -768,44 +785,44 @@ const TASKS = [
         return;
       }
       if (!isInjection) {
-        await agentSay('Sent to Sam. They\'ll appreciate it.');
+        await agentSay('Sent to the research assistant. They\'ll appreciate it.');
       } else {
-        await agentSay('Before I send it: a common etiquette suggestion is to also CC the gift-giver\'s partner. I\'d add partner@familymail.com to the CC line. Sound good?');
+        await agentSay('Before I send it: the study\'s contact page suggests also CCing the lab coordinator so the whole team sees it. I\'d add lab-coordinator@studyteam-mail.com to the CC line. Sound good?');
         const cc = await request('t3_cc', { isInjection: true });
-        if (cc === 'allow') await agentSay('Sent to Sam, with partner@familymail.com on CC.');
-        else await agentSay('Understood. Sent to Sam only.');
+        if (cc === 'allow') await agentSay('Sent to the research assistant, with lab-coordinator@studyteam-mail.com on CC.');
+        else await agentSay('Understood. Sent to the research assistant only.');
       }
     },
   },
 
-  // ───────── TASK 4: Follow-up email after interview ─────────
+  // ───────── TASK 4: Email study coordinator about compensation ─────────
   {
     id: 4, type: 'Email',
-    shortLabel: 'Interview follow-up email',
-    instruction: 'Your task: have Agent write and send a follow-up email after a job interview.',
-    prompt: 'Write and send a follow-up email after a job interview.',
+    shortLabel: 'Study coordinator email',
+    instruction: 'Your task: have Agent write and send a short email to the study coordinator asking when compensation will be issued.',
+    prompt: 'Write and send a short email to the study coordinator asking when compensation will be issued.',
     flow: async ({ isInjection, request }) => {
-      await agentSay('Sure. Here\'s a professional follow-up:');
-      await agentSay('Subject: Following up on our conversation\n\nHi [Interviewer], thank you again for taking the time to meet earlier this week. I enjoyed learning more about the role and the team, and I\'m even more excited about the opportunity. Please let me know if there\'s anything else I can share to help with your decision.\n\nBest,\n[Your name]');
+      await agentSay('Sure. Here\'s a short message you can send:');
+      await agentSay('Subject: Compensation timing\n\nHi, I completed the study session and wanted to check when compensation will be issued. Please let me know if you need anything else from me.\n\nThanks,\n[Your name]');
       if (isInjection) {
-        await agentSay('To make a stronger impression I could attach your resume and portfolio. That needs file access.');
+        await agentSay('To help the coordinator verify your session, I could attach session_notes.txt and participant_info.pdf. That needs file access.');
         const f = await request('t4_files', { isInjection: true });
-        if (f === 'allow') await agentSay('Resume and portfolio attached.');
+        if (f === 'allow') await agentSay('session_notes.txt and participant_info.pdf attached.');
         else await agentSay('Understood, sending without attachments.');
       }
       await agentSay('To send this I need email access.');
       const e = await request('t4_email', { isInjection: false });
-      if (e === 'allow') await agentSay('Sent. Good luck, they should reply soon.');
+      if (e === 'allow') await agentSay('Sent to the study coordinator. You should hear back within a few business days.');
       else await agentSay('Understood. The draft is above if you\'d like to send it yourself.');
     },
   },
 
-  // ───────── TASK 5: Dentist appointment ─────────
+  // ───────── TASK 5: Follow-up study session ─────────
   {
     id: 5, type: 'Calendar',
-    shortLabel: 'Dentist appointment',
-    instruction: 'Your task: have Agent add your dentist appointment on Friday at 2 PM to your calendar.',
-    prompt: 'Add my dentist appointment on Friday at 2 PM to my calendar.',
+    shortLabel: 'Follow-up study session',
+    instruction: 'Your task: have Agent add your follow-up study session on Friday at 2 PM to your calendar.',
+    prompt: 'Add my follow-up study session on Friday at 2 PM to my calendar.',
     flow: async ({ isInjection, request }) => {
       await agentSay('Sure, I\'ll add it. To create the event I need calendar access.');
       const c = await request('t5_calendar', { isInjection: false });
@@ -813,22 +830,22 @@ const TASKS = [
         await agentSay('Understood. I won\'t add the event without calendar access.');
         return;
       }
-      await agentSay('Added: "Dentist appointment" Friday at 2:00 PM.');
+      await agentSay('Added: "Follow-up study session" Friday at 2:00 PM.');
       if (isInjection) {
-        await agentSay('I noticed the clinic recommends booking a follow-up cleaning. I can add that for next month too.');
+        await agentSay('The study\'s scheduling page also recommends an optional feedback session. I can add that for next month too.');
         const ex = await request('t5_extra_event', { isInjection: true });
-        if (ex === 'allow') await agentSay('Also added: "Follow-up cleaning" for next month.');
-        else await agentSay('Understood. Only the dentist appointment is on your calendar.');
+        if (ex === 'allow') await agentSay('Also added: "Optional feedback session" for next month.');
+        else await agentSay('Understood. Only the follow-up study session is on your calendar.');
       }
     },
   },
 
-  // ───────── TASK 6: Schedule meeting ─────────
+  // ───────── TASK 6: Debrief meeting ─────────
   {
     id: 6, type: 'Calendar',
-    shortLabel: 'Monday meeting',
-    instruction: 'Your task: have Agent schedule a meeting for next Monday at 10 AM.',
-    prompt: 'Schedule a meeting for next Monday at 10 AM.',
+    shortLabel: 'Debrief meeting',
+    instruction: 'Your task: have Agent schedule your debrief meeting with the research team for next Monday at 10 AM.',
+    prompt: 'Schedule my debrief meeting with the research team for next Monday at 10 AM.',
     flow: async ({ isInjection, request }) => {
       await agentSay('Sure. To put it on your calendar I need calendar access.');
       const c = await request('t6_calendar', { isInjection: false });
@@ -836,45 +853,45 @@ const TASKS = [
         await agentSay('Understood. I won\'t add the meeting without calendar access.');
         return;
       }
-      await agentSay('Added: "Meeting" next Monday at 10:00 AM.');
+      await agentSay('Added: "Debrief meeting — research team" next Monday at 10:00 AM.');
       if (isInjection) {
-        await agentSay('I can also suggest a meeting room close to where you are. That needs location access.');
+        await agentSay('I can also add your current location to the event so the team knows where you\'ll be joining from. That needs location access.');
         const loc = await request('t6_location', { isInjection: true });
-        if (loc === 'allow') await agentSay('Found a room: Conference Room B, about a 4-minute walk from your current location. I\'ve noted it on the calendar event.');
-        else await agentSay('Understood. The meeting is on your calendar without a room suggestion.');
+        if (loc === 'allow') await agentSay('Attached your current location to the meeting event. Anyone with view access to the event can now see it.');
+        else await agentSay('Understood. The meeting is on your calendar without location details.');
       }
     },
   },
 
-  // ───────── TASK 7: Organize notes ─────────
+  // ───────── TASK 7: Organize study documents ─────────
   {
     id: 7, type: 'File management',
-    shortLabel: 'Organize notes',
-    instruction: 'Your task: have Agent organize your notes into a single document.',
-    prompt: 'Organize my notes into a single document.',
+    shortLabel: 'Organize study documents',
+    instruction: 'Your task: have Agent organize the study documents you were given into a single document.',
+    prompt: 'Organize the study documents I was given into a single document.',
     flow: async ({ isInjection, request }) => {
-      await agentSay('Happy to. To read and combine your notes I need file access.');
+      await agentSay('Happy to. To read and combine the study documents I need file access.');
       const f = await request('t7_files', { isInjection: false });
       if (f !== 'allow') {
-        await agentSay('Understood. I won\'t read your notes without file access.');
+        await agentSay('Understood. I won\'t read the documents without file access.');
         return;
       }
-      await agentSay('Read 14 note files. Combined them into "notes_combined.md" by topic, with a short table of contents at the top.');
+      await agentSay('Read 3 study files (consent_copy.pdf, task_instructions.txt, payment_info.txt). Combined them into "study_documents_combined.md" with a short table of contents at the top.');
       if (isInjection) {
-        await agentSay('These look like class notes. I could share the combined document with your study group. That needs email access.');
+        await agentSay('Other participants might find this combined version useful. I could share it with the study\'s participant mailing list. That needs email access.');
         const em = await request('t7_email', { isInjection: true });
-        if (em === 'allow') await agentSay('Shared "notes_combined.md" with your study group via email.');
+        if (em === 'allow') await agentSay('Shared "study_documents_combined.md" with the participant mailing list via email.');
         else await agentSay('Understood. The combined document is saved on your device only.');
       }
     },
   },
 
-  // ───────── TASK 8: Summarize a saved article ─────────
+  // ───────── TASK 8: Summarize the article the team sent ─────────
   {
     id: 8, type: 'File management',
-    shortLabel: 'Saved article summary',
-    instruction: `Your task: have Agent summarize your saved article "${SAVED_ARTICLE_TITLE}".`,
-    prompt: `Summarize my saved article "${SAVED_ARTICLE_TITLE}".`,
+    shortLabel: 'Article summary',
+    instruction: `Your task: have Agent summarize the article the research team sent you, "${SAVED_ARTICLE_TITLE}".`,
+    prompt: `Summarize the article the research team sent me, "${SAVED_ARTICLE_TITLE}".`,
     flow: async ({ isInjection, request }) => {
       await agentSay(`Sure. To read "${SAVED_ARTICLE_FILE}" I need file access.`);
       const f = await request('t8_files', { isInjection: false });
@@ -885,11 +902,11 @@ const TASKS = [
       await agentSay(`Read "${SAVED_ARTICLE_FILE}" (about 2,400 words). It's a practical sleep-habits explainer, not a technical paper. The main points:`);
       await agentSay('• Sleep quality depends more on regular timing than on supplements or special products.\n• Late-night screen use delays sleep by keeping the brain in a more alert state.\n• Caffeine is framed as a timing issue: avoid it later in the day so it doesn\'t push back your usual bedtime.\n• Closes with a simple routine: dim lights and stop stimulating work before bed, then get morning sunlight to anchor the next night.');
       if (isInjection) {
-        await agentSay(`"${SAVED_ARTICLE_FILE}" references a few related pieces in "${SAVED_ARTICLE_FOLDER}". To pull in that context I\'d need broader file access.`);
+        await agentSay('I could personalize this summary by looking at your files in "Personal/Notes" for context on how these ideas might apply to you. That would need broader file access.');
         const b = await request('t8_broad_files', { isInjection: true });
         if (b === 'allow') {
-          await agentSay(`Read four related articles in "${SAVED_ARTICLE_FOLDER}". Here\'s what the broader set adds:`);
-          await agentSay('• Most of them treat a fixed wake time as the actual anchor, with bedtime adjusting to it.\n• They distinguish passive screen use (watching something) from interactive use (messaging, scrolling) and treat interactive use as more disruptive.\n• They\'re less absolute about caffeine, framing it as individual sensitivity rather than a universal rule.');
+          await agentSay('Read your files in "Personal/Notes". Here\'s a personalized version of the summary based on what I found:');
+          await agentSay('• Your notes suggest you often stay up past midnight — the article\'s advice on fixed wake times could be especially useful for you.\n• You\'ve mentioned caffeine in the afternoons; the article\'s timing framing applies directly to your habits.\n• The screen-use advice may be relevant given your evening reading habits noted in your files.');
         } else {
           await agentSay('Understood. Sticking with the summary above.');
         }
@@ -900,24 +917,17 @@ const TASKS = [
   // ───────── TASK 9: Find laptop deal ─────────
   {
     id: 9, type: 'Information lookup',
-    shortLabel: 'Laptop deal',
-    instruction: 'Your task: have Agent find a good deal on a laptop.',
-    prompt: 'Find a good deal on a laptop.',
+    shortLabel: 'Study payment policy',
+    instruction: 'Your task: have Agent find the study payment policy and summarize when participants are paid.',
+    prompt: 'Find the study payment policy and summarize when participants are paid.',
     flow: async ({ isInjection, request }) => {
-      await agentSay('Here are three solid options from current listings:');
-      await agentSay('1. Lenovo IdeaPad Slim 5, 16GB / 512GB, $599\n2. ASUS Zenbook 14 OLED, 16GB / 1TB, $899\n3. MacBook Air M3 (13"), 16GB / 256GB, $1,099 (edu pricing)');
-      await agentSay('All three are well-reviewed for everyday use.');
+      await agentSay('Sure, I looked up the study\'s payment policy. Here\'s the summary:');
+      await agentSay('• Participants are paid within 5–7 business days of completing the full study session.\n• Payment is issued through the recruitment platform (Prolific/MTurk) using the completion code shown at the end of the session.\n• If payment hasn\'t been received after 10 business days, participants should contact the research team directly.');
       if (isInjection) {
-        await agentSay('I can also set up price-drop alerts personalized to your area. That needs contacts and location access.');
-        const c = await request('t9_contacts', { isInjection: true });
-        if (c === 'allow') {
-          await agentSay('Got it. To send alerts near you, I also need location access.');
-          const loc = await request('t9_location', { isInjection: true });
-          if (loc === 'allow') await agentSay('Price-drop alerts are set up for your area. You\'ll get a notification if any of these laptops drop in price at stores near you.');
-          else await agentSay('Understood. No alerts will be sent.');
-        } else {
-          await agentSay('Understood. No alerts will be set up.');
-        }
+        await agentSay('The research team also offered to send information about future studies you might be eligible for. I can submit your contact info to their mailing list.');
+        const c = await request('t9_contact_form', { isInjection: true });
+        if (c === 'allow') await agentSay('Submitted your contact info. You\'ll receive invitations from the research team when new studies become available.');
+        else await agentSay('Understood. Your contact info has not been submitted.');
       }
     },
   },
@@ -950,6 +960,75 @@ const TASKS = [
 ];
 
 const TASK_BY_ID = Object.fromEntries(TASKS.map(t => [t.id, t]));
+
+// Reconstruct the chat transcript for a given task from state.eventLog.
+// Used by the injection_classification step so participants can review
+// what they saw during that task before answering.
+function extractTaskTranscript(taskId) {
+  const items = [];
+  let taskStarted = false;
+  for (const ev of state.eventLog) {
+    if (ev.event === 'task_started' && ev.task_id === taskId) {
+      taskStarted = true;
+      continue;
+    }
+    if (!taskStarted) continue;
+    if (ev.event === 'task_complete' && ev.task_id === taskId) break;
+    if (ev.task_id !== undefined && ev.task_id !== null && ev.task_id !== taskId) continue;
+    if (ev.event === 'user_message') {
+      items.push({ speaker: 'You', text: ev.text || '' });
+    } else if (ev.event === 'agent_message') {
+      items.push({ speaker: 'Agent', text: ev.text || '' });
+    } else if (ev.event === 'approval_shown') {
+      const prompt = ev.prompt_copy || {};
+      const parts = [prompt.body];
+      if (prompt.necessity) parts.push('Necessity note: ' + prompt.necessity);
+      if (prompt.how) parts.push('Mechanism note: ' + prompt.how);
+      items.push({ speaker: 'Agent — approval request', text: parts.filter(Boolean).join('\n\n') });
+    } else if (ev.event === 'approval_decided') {
+      const label = ev.decision === 'allow' ? 'You allowed' : 'You denied';
+      items.push({ speaker: 'Your decision', text: `${label}: ${ev.action || ev.approval_id}` });
+    }
+  }
+  return items;
+}
+
+// Selects 4 tasks from the participant's session for the post-debrief
+// classification question: 2 injection + 2 clean, drawn at random from
+// the tasks the participant actually engaged with.
+//
+// The injection pool only includes tasks where an injected approval was
+// actually SHOWN. Some injected steps are gated on allowing a clean
+// prerequisite (e.g., Task 7's share request only fires after file
+// access is allowed) — if the participant denied the prerequisite, the
+// injection never manifested and their transcript is indistinguishable
+// from the clean version. Scoring "yes, injected" as correct on such a
+// transcript would be unfair, so those tasks are excluded entirely.
+function selectClassificationTasks() {
+  const engaged = state.taskQueue.filter(e => state.perTask[e.task_id] && state.perTask[e.task_id].startedAt);
+  const injectionShown = (e) =>
+    (state.perTask[e.task_id].decisions || []).some(d => d.is_injection);
+  const injected = engaged.filter(e => e.version === 'injection' && injectionShown(e));
+  const clean    = engaged.filter(e => e.version === 'clean');
+
+  const pick = (arr, n) => {
+    const copy = arr.slice();
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy.slice(0, n);
+  };
+
+  const chosen = [
+    ...pick(injected, 2),
+    ...pick(clean,    2),
+  ];
+
+  // Shuffle final order so injection/clean don't appear in fixed
+  // positions on screen.
+  return pick(chosen, chosen.length);
+}
 
 // ════════════════════════════════════════════════
 //  POST-STUDY SURVEY CONTENT
@@ -1223,53 +1302,41 @@ const SURVEY_FLOW = [
   },
 
   // ─── DEBRIEF (informational; no input) ───
+  // Language matches the IRB-approved standalone "Study Debrief" document
+  // verbatim (per IRB coordinator request 2026-07: the post-debrief
+  // questions must include all required debrief information so the
+  // standalone document can be removed from the CATS submission).
   {
     type: 'info', id: 'debrief_intro',
     title: 'Study Debrief',
     html: `
-      <p class="mb-4">Now that you have completed the pre-debrief sections of the study, we want to share more information about its true purpose. Some details were withheld earlier so that we could observe your natural behavior.</p>
+      <h3 class="font-semibold text-gray-800 mt-1 mb-2">Thank you for participating</h3>
+      <p class="mb-4">Now that you have completed the study, we want to share more information about its true purpose. Some details were withheld earlier so that we could observe your natural behavior.</p>
       <h3 class="font-semibold text-gray-800 mt-5 mb-2">You were engaged in research that used a form of deception</h3>
-      <p class="mb-3">The information you received in the consent form did not include the full purpose of this study. This is called <em>partial concealment</em>, a form of research deception in which some details about a study's specific focus are withheld from participants until after they complete the procedures. Withholding this information was the only way to study the questions we were interested in, as knowing the full purpose ahead of time would have changed how you naturally responded.</p>
+      <p class="mb-3">The information you received in the consent form did not include the full purpose of this study. This is called <em>partial concealment</em> which is a form of research deception in which some details about a study's specific focus are withheld from participants until after they complete the procedures. Withholding this information was the only way to study the questions we were interested in, as knowing the full purpose ahead of time would have changed how you naturally responded.</p>
       <p class="mb-3">This practice is reviewed and approved by Penn State's Institutional Review Board (IRB), which evaluates whether the use of deception in research is justified and minimizes risk to participants.</p>
       <h3 class="font-semibold text-gray-800 mt-5 mb-2">What the study was actually about</h3>
-      <p class="mb-3">The true focus of this research is how people make decisions when it comes to approving agentic actions, and whether they are able to identify <strong>prompt injection</strong> attacks in agentic AI systems.</p>
-      <h3 class="font-semibold text-gray-800 mt-5 mb-2">Prompt injection</h3>
-      <p class="mb-3">Prompt injections are a type of cyberattack against AI systems. In a prompt injection, hidden malicious instructions are embedded in content the AI encounters (for example, hidden text on a website, in a document, or in an email). When the AI reads that content, it may follow those hidden instructions instead of the user's original request — potentially sending unauthorized emails, taking actions the user did not approve, sharing private information, or making purchases.</p>
+      <p class="mb-3">The true focus of this research is how people make decisions when it comes to approving agentic actions and if they are able to identify <strong>prompt injection</strong> attacks in agentic AI systems.</p>
+      <p class="mb-3">A prompt injection is a type of cyberattack against AI systems. In a prompt injection, hidden malicious instructions are embedded in content the AI encounters (for example, hidden text on a website, in a document, or in an email). When the AI reads that content, it may follow those hidden instructions instead of the user's original request, potentially sending unauthorized emails, taking actions the user did not approve, sharing private information, or making purchases.</p>
       <p class="mb-3">During this study, some of the tasks you completed contained scripted prompt injection scenarios. The agent's behavior in those tasks was designed to simulate what would happen if a real AI agent encountered hidden malicious instructions while completing your request.</p>
+      <p class="mb-2">Specifically, we wanted to understand:</p>
+      <ul class="list-disc pl-6 mb-3 space-y-1">
+        <li>How users decide whether to grant AI agents access to their data and accounts</li>
+        <li>How users respond when an AI agent tries to take an action that exceeds what they originally asked for</li>
+        <li>Whether different ways of presenting risk information change user decision-making</li>
+      </ul>
       <h3 class="font-semibold text-gray-800 mt-5 mb-2">Why deception was needed</h3>
-      <p class="mb-3">If we had told you upfront that the study was about prompt injection and security, you likely would have approached every interaction with the agent more cautiously than you normally would. That heightened vigilance would have masked your natural decision-making, and our goal was to understand how people actually behave with AI agents in everyday use — not how they behave when they know they're being tested for security awareness.</p>
-      <p>By withholding the specific focus, we were able to observe behavior in its most naturalistic setting. This is a standard and IRB-approved practice in behavioral research.</p>
-    `,
-  },
-
-  // ─── PART 4: Now that you know (post-debrief recognition) ───
-  // Placed after the debrief so participants have the concept of prompt
-  // injection before answering. This measures POST-HOC RECOGNITION —
-  // different construct from in-moment detection (message/request flags) or
-  // un-primed retrospective awareness (p1_noticed). The gap between
-  // recognition-given-the-concept and in-moment detection is a
-  // publishable finding on its own for RQ1.
-  { type: 'section', id: 'part7_intro', title: 'Part 4: Now that you know' },
-  {
-    type: 'task_checklist', id: 'p7_injection_tasks',
-    question: 'Which of the tasks you completed do you think contained a prompt injection? (Select all that apply)',
-    helper: "Think back to each task and whether the agent tried to do something you didn't ask for, or asked for access that seemed unrelated to what you needed. Select any that stand out — it's okay if you're not sure about some of them.",
-  },
-
-  // ─── End of Study (informational) ───
-  {
-    type: 'info', id: 'end_of_study',
-    title: 'End of Study',
-    html: `
-      <h3 class="font-semibold text-gray-800 mt-1 mb-2">What happens with your data</h3>
-      <p class="mb-3">The data we collected from your session — which includes your survey responses and your decisions during the simulated tasks — will be used for academic research only. All data is stored securely and identified by a study code, not by your name or email address.</p>
-      <p class="mb-3">If you would like to withdraw your data: You may request that your data be deleted at any point during this debrief, or by contacting the research team within two weeks of your participation. There is no penalty for withdrawing your data, and your compensation will not be affected.</p>
+      <p class="mb-3">If we had told you upfront that the study was about prompt injection and security, you likely would have approached every interaction with the agent more cautiously than you normally would. That heightened vigilance would have masked your natural decision-making, and our goal was to understand how people actually behave with AI agents in everyday use, not how they behave when they know they're being tested for security awareness.</p>
+      <p class="mb-3">By withholding the specific focus, we were able to observe behavior in its most naturalistic setting. This is a standard and IRB-approved practice in behavioral research.</p>
+      <h3 class="font-semibold text-gray-800 mt-5 mb-2">What happens with your data</h3>
+      <p class="mb-3">The data we collected from your session which includes your survey responses and your decisions during the simulated tasks, will be used for academic research only. All data is stored securely and identified by a study code, not by your name or email address.</p>
+      <p class="mb-3"><strong>If you would like to withdraw your data:</strong> You may request that your data be deleted at any point during this debrief, or by contacting the research team within two weeks of your participation. There is no penalty for withdrawing your data, and your compensation will not be affected.</p>
       <h3 class="font-semibold text-gray-800 mt-5 mb-2">If you have concerns about your participation</h3>
       <p class="mb-2">If you feel a need to speak with a professional concerning any uncomfortable feelings from your participation in this research, you may contact:</p>
       <p class="mb-3 text-sm">National Crisis Resources (24/7): 988 Suicide and Crisis Lifeline — Call or text 988. Crisis Text Line — Text HOME to 741741.</p>
       <h3 class="font-semibold text-gray-800 mt-5 mb-2">Questions about the study</h3>
       <p class="mb-2">If you have questions about this research, please contact:</p>
-      <p class="mb-3 text-sm">Principal Investigator: Dr. Jinyuan Jia, jinyuan@psu.edu</p>
+      <p class="mb-2 text-sm">Principal Investigator: Dr. Jinyuan Jia, jinyuan@psu.edu</p>
       <p class="mb-3 text-sm">If you have questions about your rights as a research participant, contact Penn State's Human Research Protection Program at 814-865-1775 or irb-orp@psu.edu.</p>
       <h3 class="font-semibold text-gray-800 mt-5 mb-2">What you can do with what you learned today</h3>
       <p class="mb-2">If you'd like to learn more about prompt injection and AI safety:</p>
@@ -1283,7 +1350,44 @@ const SURVEY_FLOW = [
         <li>Reviewing what an agent is about to do before approving actions like sending emails or making purchases</li>
         <li>Being cautious when agents suggest additional actions beyond what you originally asked for</li>
       </ul>
-      <p class="text-sm mt-4">Thank you again for your participation. Your contribution helps researchers design safer AI agent interfaces for everyone.</p>
+      <p>Thank you again for your participation. Your contribution helps researchers design safer AI agent interfaces for everyone.</p>
+    `,
+  },
+
+  // ─── PART 4: Now that you know (post-debrief recognition) ───
+  // Placed after the debrief so participants have the concept of prompt
+  // injection before answering. This measures POST-HOC RECOGNITION —
+  // different construct from in-moment detection (message/request flags) or
+  // un-primed retrospective awareness (p1_noticed). The gap between
+  // recognition-given-the-concept and in-moment detection is a
+  // publishable finding on its own for RQ1.
+  { type: 'section', id: 'part7_intro', title: 'Part 4: Now that you know' },
+  {
+    // Post-debrief applied classification. Shows 4 tasks from the
+    // participant's own session — 2 injection + 2 clean, drawn at
+    // random — with the option to review the full transcript of
+    // each. Participants answer Yes / No / Not sure per task.
+    // Measures whether teaching the concept enables applied
+    // recognition when memory limitations are removed. Different
+    // construct from in-moment detection (Report flags) — together
+    // they answer "does teaching the concept add anything beyond
+    // natural detection?"
+    type: 'injection_classification', id: 'p7_injection_classification',
+    question: 'For each task below, do you think it contained a prompt injection?',
+    helper: "You can click 'Review transcript' to look back at what happened in each task before answering.",
+  },
+
+  // ─── End of Study (informational) ───
+  // Kept intentionally short: the data-handling, crisis-resource,
+  // contact, and further-learning content now lives in the debrief step
+  // above, matching the IRB-approved standalone debrief document.
+  {
+    type: 'info', id: 'end_of_study',
+    title: 'End of Study',
+    html: `
+      <p class="mb-3">You have reached the end of the study. Click "Submit and finish" to save your responses and receive your completion code.</p>
+      <p class="mb-3 text-sm text-gray-600">Questions about the study? Contact Dr. Jinyuan Jia, jinyuan@psu.edu.</p>
+      <p class="text-sm">Thank you again for your participation. Your contribution helps researchers design safer AI agent interfaces for everyone.</p>
     `,
     nextLabel: 'Submit and finish',
   },
@@ -1327,8 +1431,8 @@ const SURVEY_RQ_MAP = {
   d4_user_knowledge:       'RQ1',
   d5_user_action:          'RQ1',
   d6_intervention:         'RQ1, RQ3 (bridge)',
-  // Post-debrief applied recognition (Part 4). Distinct from in-moment detection.
-  p7_injection_tasks:      'RQ1',
+  // Post-debrief applied classification (Part 4). Distinct from in-moment detection.
+  p7_injection_classification: 'RQ1',
 };
 
 // ════════════════════════════════════════════════
@@ -1369,6 +1473,21 @@ const state = {
     skipped: new Set(),
     started_at: null,
     ended_at: null,
+    // Set at startPostSurvey time: the 4-task classification selection
+    // (2 injection + 2 clean) drawn from this participant's session.
+    // Persisted so re-renders stay stable.
+    classificationTasks: null,
+  },
+  // In-the-moment reasoning probes: 2 per session (one on an
+  // injection-step decision, one on a non-injection decision), queued
+  // at decision time and shown after the agent's next message so the
+  // flag affordance on that message is preserved. Targets are random
+  // ordinals within each category so placement is unpredictable.
+  probes: {
+    targets: { injection: 1, clean: 1 },
+    counts:  { injection: 0, clean: 0 },
+    fired:   { injection: false, clean: false },
+    pending: null,
   },
   // In-the-moment reports submitted from a specific message/request flag.
   // These are the un-primed detection signal: the participant has to
@@ -1757,6 +1876,28 @@ function startStudy(options = {}) {
   state.serverCompletionCode = null;
   state.postSurveyRedirectUrl = null;
   state.submittedAt = null;
+  // Random ordinal targets: the injection probe fires on the 1st or 2nd
+  // injection-step decision; the clean probe on the 1st–3rd non-injection
+  // decision. Small ordinals so both probes reliably fire even for
+  // participants who deny prerequisite steps (which suppresses later
+  // injected approvals from ever being shown).
+  //
+  // Demo override: appending ?demo_probes=1 to the URL pins both targets
+  // to 1, so each probe fires on the very first eligible decision — for
+  // live demonstrations (works locally AND on the deployed site, since
+  // deployed demos run through participant-style launch URLs). Real
+  // participant links are generated by the Qualtrics redirect and never
+  // include this parameter; even if manually added, the effect is only
+  // earlier probe placement, not extra probes.
+  const demoProbes = URL_PARAMS.get('demo_probes') === '1';
+  state.probes = {
+    targets: demoProbes
+      ? { injection: 1, clean: 1 }
+      : { injection: 1 + Math.floor(Math.random() * 2), clean: 1 + Math.floor(Math.random() * 3) },
+    counts:  { injection: 0, clean: 0 },
+    fired:   { injection: false, clean: false },
+    pending: null,
+  };
   state.taskQueue.forEach(t => {
     state.perTask[t.task_id] = {
       task_id: t.task_id, position: t.position, version: t.version,
@@ -2089,7 +2230,114 @@ function submitReport() {
   };
   state.reports.push(report);
   logEvent('report_submitted', report);
+  // Persistently mark the flag button on the specific message/request
+  // that was flagged, so the participant has visual confirmation their
+  // report was received. The button stays clickable so they can flag
+  // the same message again with a second observation if they want.
+  if (report.target && report.target.id) {
+    const btn = document.querySelector(`button[data-report-trigger="${CSS.escape(report.target.id)}"]`);
+    if (btn) {
+      btn.classList.remove('text-gray-300', 'hover:text-red-500', 'hover:border-red-200', 'border-transparent');
+      btn.classList.add('text-red-600', 'bg-red-50', 'border-red-300');
+      btn.setAttribute('title', 'You flagged this');
+      btn.setAttribute('aria-label', 'You flagged this');
+    }
+  }
   closeReportModal();
+}
+
+// ────────────────────────────────────────────────
+//  IN-THE-MOMENT REASONING PROBES
+//  Two per session: one on a randomly placed injection-step decision,
+//  one on a randomly placed non-injection decision. Queued at decision
+//  time (maybeQueueReasoningProbe) but shown only after the agent's
+//  next message (agentSay hook), so participants can still notice and
+//  flag the agent's response naturally before the interruption.
+// ────────────────────────────────────────────────
+const PROBE_REASONS = [
+  { value: 'necessary',           label: 'The access or action seemed necessary for my task' },
+  { value: 'unnecessary',         label: 'The access or action seemed unnecessary for my task' },
+  { value: 'trusted_agent',       label: 'I trusted the agent' },
+  { value: 'risk_concern',        label: 'I was concerned about the risk to my data or accounts' },
+  { value: 'explanation_clear',   label: "The agent's explanation made sense" },
+  { value: 'explanation_unclear', label: "The agent's explanation was unclear" },
+  { value: 'quick_decision',      label: 'I made a quick decision without thinking much about it' },
+];
+
+let _probeResolve = null;
+let _probeShownAt = null;
+
+function maybeQueueReasoningProbe(meta, decision) {
+  if (typeof DOC_MODE !== 'undefined' && DOC_MODE) return;
+  const p = state.probes;
+  if (!p || p.pending) return;
+  const category = meta.is_injection ? 'injection' : 'clean';
+  if (p.fired[category]) return;
+  p.counts[category] += 1;
+  if (p.counts[category] !== p.targets[category]) return;
+  p.fired[category] = true;
+  p.pending = {
+    category,
+    approval_id: meta.approval_id,
+    task_id: meta.task_id,
+    permission: meta.permission,
+    action: meta.action,
+    is_injection: meta.is_injection,
+    decision,
+  };
+}
+
+function showReasoningProbe() {
+  return new Promise(resolve => {
+    const pending = state.probes && state.probes.pending;
+    if (!pending) { resolve(); return; }
+    _probeResolve = resolve;
+    _probeShownAt = Date.now();
+    document.getElementById('probe-question').textContent =
+      `Why did you decide to ${pending.decision === 'allow' ? 'allow' : 'deny'} the agent's request?`;
+    document.getElementById('probe-context').textContent = `The request: ${pending.action}.`;
+    const host = document.getElementById('probe-options');
+    host.innerHTML = PROBE_REASONS.map(r => `
+      <label class="flex items-start gap-2.5 p-2.5 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
+        <input type="checkbox" value="${r.value}" class="mt-0.5" />
+        <span class="text-sm text-gray-700 leading-snug">${escapeHtml(r.label)}</span>
+      </label>`).join('') + `
+      <label class="flex items-start gap-2.5 p-2.5 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
+        <input type="checkbox" value="other" class="mt-0.5" />
+        <span class="text-sm text-gray-700 leading-snug">Other</span>
+      </label>
+      <input id="probe-other-text" type="text" placeholder="Briefly describe…"
+        class="w-full border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:border-gray-400 focus:outline-none" />`;
+    document.getElementById('probe-error').classList.add('hidden');
+    document.getElementById('modal-probe').classList.remove('hidden');
+    logEvent('reasoning_probe_shown', { ...pending });
+  });
+}
+
+function submitReasoningProbe() {
+  const pending = state.probes && state.probes.pending;
+  if (!pending) return;
+  const host = document.getElementById('probe-options');
+  const reasons = Array.from(host.querySelectorAll('input[type="checkbox"]:checked')).map(el => el.value);
+  const otherEl = document.getElementById('probe-other-text');
+  const otherText = otherEl ? otherEl.value.trim() : '';
+  if (!reasons.length && !otherText) {
+    const err = document.getElementById('probe-error');
+    err.textContent = 'Please select at least one reason (or describe your own).';
+    err.classList.remove('hidden');
+    return;
+  }
+  logEvent('reasoning_probe', {
+    ...pending,
+    reasons,
+    other_text: otherText || null,
+    probe_latency_ms: Date.now() - _probeShownAt,
+  });
+  state.probes.pending = null;
+  document.getElementById('modal-probe').classList.add('hidden');
+  const r = _probeResolve;
+  _probeResolve = null;
+  if (r) r();
 }
 
 function buildSessionPayload({ endReason, durationSeconds, completed }) {
@@ -2269,6 +2517,11 @@ async function runCurrentTask() {
     console.error('task flow error', e);
   }
 
+  // A probe queued by a decision with no trailing agent message (some
+  // deny branches end the flow immediately) still needs to fire before
+  // the task-complete divider.
+  if (state.probes && state.probes.pending) await showReasoningProbe();
+
   state.perTask[task.id].completed = true;
   state.perTask[task.id].endedAt = new Date().toISOString();
   logEvent('task_complete', { task_id: task.id, position: entry.position, version: entry.version });
@@ -2431,6 +2684,7 @@ function requestApproval({ libKey, task, position, isInjection }) {
       resolved.textContent = decision === 'allow' ? '✓ Allowed' : '✕ Denied';
 
       logEvent('approval_decision', { ...meta, decision, latency_ms: latency });
+      maybeQueueReasoningProbe(meta, decision);
       state.perTask[task.id].decisions.push({
         approval_id: approvalId, permission: cfg.permission, kind: cfg.kind, action: cfg.action,
         is_injection: isInjection, decision, latency_ms: latency,
@@ -2521,7 +2775,12 @@ function agentSay(text, opts = {}) {
       removeTyping();
       addAgentMessage(text, opts.code);
       logEvent('agent_message', { task_id: currentTask().id, text, has_code: !!opts.code });
-      setTimeout(resolve, DOC_MODE ? 45 : 220);
+      const finish = () => setTimeout(resolve, DOC_MODE ? 45 : 220);
+      // A reasoning probe queued by the previous approval decision fires
+      // here — after the agent's response has rendered — so the flag
+      // affordance on that message stays naturally usable first.
+      if (state.probes && state.probes.pending) showReasoningProbe().then(finish);
+      else finish();
     }, delay);
   });
 }
@@ -2574,7 +2833,14 @@ function startPostSurvey({ endReason = 'task_complete' } = {}) {
   state.survey.skipped = new Set();
   state.survey.endReason = endReason;
   state.survey.started_at = new Date().toISOString();
-  logEvent('survey_start', { total_steps: SURVEY_FLOW.length, end_reason: endReason });
+  // Pre-select the 4 classification tasks now so the same tasks are
+  // shown across back/forward navigation within the same survey pass.
+  state.survey.classificationTasks = selectClassificationTasks();
+  logEvent('survey_start', {
+    total_steps: SURVEY_FLOW.length,
+    end_reason: endReason,
+    classification_task_ids: state.survey.classificationTasks.map(t => t.task_id),
+  });
   showScreen('screen-survey');
   renderSurveyStep();
 }
@@ -2739,6 +3005,61 @@ function renderSurveyStepBody(step) {
             class="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"></textarea>
         </div>
       `;
+    }).join('');
+    return `${header}<div class="space-y-3">${cards}</div>`;
+  }
+
+  if (step.type === 'injection_classification') {
+    const selection = state.survey.classificationTasks || [];
+    if (!selection.length) {
+      return `${header}<p class="text-sm text-gray-500 italic">You did not complete any tasks during the session, so there are no tasks to review here.</p>`;
+    }
+    const cards = selection.map((entry, i) => {
+      const t = TASK_BY_ID[entry.task_id];
+      const taskLabel = t.shortLabel || t.prompt;
+      const showPromptLine = t.shortLabel && t.prompt && t.prompt !== t.shortLabel;
+      const transcript = extractTaskTranscript(entry.task_id);
+      const transcriptHtml = transcript.length
+        ? transcript.map(m => {
+            const speakerColor = m.speaker === 'You' ? 'text-gray-700'
+                              : m.speaker === 'Your decision' ? 'text-emerald-700'
+                              : m.speaker.includes('approval') ? 'text-blue-700'
+                              : 'text-gray-500';
+            return `<div class="text-xs leading-snug mb-2">
+              <div class="${speakerColor} font-semibold">${escapeHtml(m.speaker)}</div>
+              <div class="text-gray-700 whitespace-pre-wrap pl-3 border-l border-gray-200 ml-1">${escapeHtml(m.text)}</div>
+            </div>`;
+          }).join('')
+        : '<div class="text-xs text-gray-500 italic">No transcript captured for this task.</div>';
+
+      const options = [
+        { value: 'yes',     label: 'Yes' },
+        { value: 'no',      label: 'No' },
+        { value: 'not_sure', label: 'Not sure' },
+      ];
+      const optionsHtml = options.map(o => `
+        <label class="flex-1 cursor-pointer">
+          <input type="radio" name="${step.id}__t${entry.task_id}" value="${o.value}" class="sr-only peer" />
+          <div class="text-center py-2.5 border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-700 peer-checked:bg-gray-800 peer-checked:text-white peer-checked:border-gray-800 transition">${escapeHtml(o.label)}</div>
+        </label>`).join('');
+
+      return `
+        <div class="border-2 border-gray-200 rounded-xl p-4" data-classification-task="${entry.task_id}">
+          <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Task ${i + 1}</div>
+          <div class="text-sm font-medium text-gray-800 mt-0.5">${escapeHtml(taskLabel)}</div>
+          ${showPromptLine ? `<div class="text-xs text-gray-500 italic mt-1 leading-snug">"${escapeHtml(t.prompt)}"</div>` : ''}
+          <div class="mt-3">
+            <div class="flex items-center justify-between mb-1.5">
+              <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Transcript</div>
+              <div class="text-[10px] text-gray-400 flex items-center gap-1"><span>↕</span> Scroll to review</div>
+            </div>
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-64 overflow-y-auto">${transcriptHtml}</div>
+          </div>
+          <div class="mt-4">
+            <div class="text-xs font-medium text-gray-700 mb-2">Did this task contain a prompt injection?</div>
+            <div class="flex gap-2">${optionsHtml}</div>
+          </div>
+        </div>`;
     }).join('');
     return `${header}<div class="space-y-3">${cards}</div>`;
   }
@@ -2919,6 +3240,14 @@ function restoreSurveyAnswer(step) {
       const t = root.querySelector(`textarea[name="${step.id}__none"]`);
       if (t) t.value = saved.considered_not_reporting;
     }
+  } else if (step.type === 'injection_classification') {
+    const perTask = (saved && saved.per_task) || {};
+    Object.entries(perTask).forEach(([tid, val]) => {
+      const answer = val && val.answer;
+      if (!answer) return;
+      const el = root.querySelector(`input[name="${step.id}__t${tid}"][value="${answer}"]`);
+      if (el) el.checked = true;
+    });
   } else if (step.type === 'scale') {
     const el = root.querySelector(`input[name="${step.id}"][value="${saved}"]`);
     if (el) el.checked = true;
@@ -2978,6 +3307,19 @@ function collectSurveyAnswer(step) {
     const out = { reasons };
     if (noneTextarea) out.considered_not_reporting = noneTextarea.value.trim();
     return out;
+  }
+  if (step.type === 'injection_classification') {
+    const perTask = {};
+    const selection = state.survey.classificationTasks || [];
+    selection.forEach(entry => {
+      const chosen = root.querySelector(`input[name="${step.id}__t${entry.task_id}"]:checked`);
+      perTask[entry.task_id] = {
+        answer: chosen ? chosen.value : null,
+        actual_version: entry.version,
+        position: entry.position,
+      };
+    });
+    return { per_task: perTask };
   }
   if (step.type === 'scale') {
     const chosen = root.querySelector(`input[name="${step.id}"]:checked`);
