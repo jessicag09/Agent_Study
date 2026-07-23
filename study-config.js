@@ -1,7 +1,7 @@
 window.__STUDY_CONFIG__ = {
   // Apps Script web app deployment URL, without a trailing slash.
   // Example: "https://script.google.com/macros/s/AKfycb.../exec"
-  apiBaseUrl: "https://script.google.com/macros/s/AKfycbxtt0E0fHhkLyqXfXzis1IC3pyECF3RbhanFKI5G4eurLCUlEfmK-ukYlqnqu43dywR/exec",
+  apiBaseUrl: "https://script.google.com/macros/s/AKfycbx8B-nWcstTQWQdjfz246o6iFd-T3IWwBiy1_651w4twYzGuiUYJE-EwY54zL0Evd9K/exec",
 
   // Qualtrics post-survey URL.
   // Left blank because the post-study survey now runs inside the

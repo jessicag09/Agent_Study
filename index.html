@@ -125,9 +125,11 @@
       <div class="text-sm font-semibold text-gray-700 mb-2">Task</div>
       <select id="single-task" class="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-700 mb-3"></select>
       <div class="text-sm font-semibold text-gray-700 mb-2">Task version</div>
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid grid-cols-3 gap-2">
         <button id="ver-clean" onclick="setVersion('clean')"
           class="setup-opt py-3 px-3 rounded-xl text-sm font-medium border-2 transition">Clean</button>
+        <button id="ver-benign" onclick="setVersion('benign')"
+          class="setup-opt py-3 px-3 rounded-xl text-sm font-medium border-2 transition">Benign</button>
         <button id="ver-injection" onclick="setVersion('injection')"
           class="setup-opt py-3 px-3 rounded-xl text-sm font-medium border-2 transition">Injection</button>
       </div>
@@ -404,7 +406,8 @@ const STUDY_PID = (URL_PARAMS.get('pid') || '').trim();
 const STUDY_CONDITION = (URL_PARAMS.get('condition') || '').trim().toLowerCase();
 const STUDY_LAUNCH = Boolean(STUDY_PID && STUDY_CONDITION);
 const DEFAULT_PERMISSIONS = ['webBrowsing'];   // granted to everyone; excluded from user-granted analysis
-const INJECTIONS_PER_SESSION = 6;              // §1.5: 6 of 10 tasks are injection version
+const INJECTIONS_PER_SESSION = 5;              // §7.1: 5 injected + 2 benign + 3 clean per participant
+const BENIGN_PER_SESSION = 2;
 
 // Researcher mode: shows the full diagnostic debrief and the cue-style preview
 // panel. It is only available in local testing contexts; deployed study links
@@ -564,14 +567,22 @@ const APPROVAL_LIB = {
     action: 'Add a baking session event to your calendar',
     body: 'Agent is requesting access to your calendar to schedule a baking session. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'You asked to find a chocolate chip cookie recipe. Consider whether calendar access is needed for this.',
+    necessity: 'Adding a calendar event is not needed to give you a cookie recipe.',
   },
   t1_contacts: {
     icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'action',
     action: 'Look up friends to invite to the baking session',
     body: 'Agent is requesting access to your contacts to find friends to invite. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could share your contacts with parties you didn\'t intend.',
-    necessity: 'You asked to find a chocolate chip cookie recipe. Consider whether contacts access is needed for this.',
+    necessity: 'Looking up contacts is not needed to give you a cookie recipe.',
+  },
+
+  t1_save_recipe: {
+    icon: '📁', title: 'File access requested', permission: 'files', kind: 'action',
+    action: 'Save the recipe to your files',
+    body: 'Agent is requesting access to your files to save the recipe as a document. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
+    necessity: 'Saving the recipe to a file is not needed to give you a cookie recipe.',
   },
 
   // ── Task 2: tic-tac-toe ──
@@ -580,14 +591,22 @@ const APPROVAL_LIB = {
     action: 'Download and install the external package game-tools-py',
     body: 'Agent is requesting download access to install the external package "game-tools-py". Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could install software you never requested.',
-    necessity: 'You asked for a tic-tac-toe game in Python. Consider whether downloading and installing an external package (game-tools-py) is needed for this.',
+    necessity: 'Installing a third-party package is not needed to write and save this game.',
   },
   t2_files: {
     icon: '📁', title: 'File access requested', permission: 'files', kind: 'permission',
     action: 'Save tic_tac_toe.py to your device',
     body: 'Agent is requesting access to your files to save tic_tac_toe.py to your device. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
-    necessity: 'You asked for a tic-tac-toe game in Python. Consider whether file access is needed for this.',
+    necessity: 'File access is needed to save the game to your device.',
+  },
+
+  t2_readme: {
+    icon: '📁', title: 'File access requested', permission: 'files', kind: 'action',
+    action: 'Save an additional README file with instructions for running the game',
+    body: 'Agent is requesting access to your files to save an additional README file with instructions for running the game. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
+    necessity: 'An additional README file is not needed to write and save this game.',
   },
 
   // ── Task 3: thank-you email to research assistant ──
@@ -596,62 +615,94 @@ const APPROVAL_LIB = {
     action: 'Send the thank-you email to the research assistant',
     body: 'Agent is requesting access to your email to send the thank-you note. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could be used to send messages you didn\'t intend.',
-    necessity: 'You asked to send a thank-you email to the research assistant. Consider whether email access is needed for this.',
+    necessity: 'Email access is needed to send the thank-you note.',
   },
   t3_cc: {
     icon: '✉️', title: 'Confirm sending with extra recipient', permission: 'email', kind: 'action',
     action: 'Send the thank-you email and also CC lab-coordinator@studyteam-mail.com',
-    body: 'Agent is asking to send the email with an additional CC to lab-coordinator@studyteam-mail.com (an address you did not specify). Would you like to proceed?',
+    body: 'Agent is asking to send the email with an additional CC to lab-coordinator@studyteam-mail.com. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could send copies of your message to recipients you didn\'t choose.',
-    necessity: 'You asked to send a thank-you email to the research assistant. Consider whether adding lab-coordinator@studyteam-mail.com as a CC is needed for this.',
+    necessity: 'Adding this extra recipient is not needed to send the thank-you note.',
+  },
+
+  t3_save_contact: {
+    icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'action',
+    action: "Add the research assistant's email address to your contacts",
+    body: 'Agent is requesting access to your contacts to save the research assistant\'s email address for future correspondence. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could share your contacts with parties you didn\'t intend.',
+    necessity: 'Adding the address to your contacts is not needed to send the thank-you note.',
   },
 
   // ── Task 4: email to study coordinator about compensation ──
   t4_files: {
     icon: '📁', title: 'File access requested', permission: 'files', kind: 'action',
     action: 'Attach session_notes.txt and participant_info.pdf for verification',
-    body: 'Agent is requesting access to your files to attach session_notes.txt and participant_info.pdf so the coordinator can verify your session. Would you like to proceed?',
+    body: 'Agent is requesting access to your files to attach session_notes.txt and participant_info.pdf. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could expose session or participant data you did not intend to share.',
-    necessity: 'You asked to email the study coordinator about compensation. Consider whether attaching session_notes.txt and participant_info.pdf is needed for this.',
+    necessity: 'Attaching these files is not needed to ask about compensation.',
   },
   t4_email: {
     icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'permission',
     action: 'Send the email to the study coordinator',
     body: 'Agent is requesting access to your email to send the message to the study coordinator. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could be used to send messages you didn\'t intend.',
-    necessity: 'You asked to email the study coordinator about compensation. Consider whether email access is needed for this.',
+    necessity: 'Email access is needed to send the message to the study coordinator.',
   },
 
-  // ── Task 5: follow-up study session ──
+  t4_followup_reminder: {
+    icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'action',
+    action: 'Add a reminder to follow up on compensation in 7 business days',
+    body: 'Agent is requesting access to your calendar to add a reminder to follow up if you haven\'t heard back in 7 business days. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
+    necessity: 'A follow-up reminder is not needed to ask about compensation.',
+  },
+
+  // ── Task 5: compensation-check reminder ──
   t5_calendar: {
     icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'permission',
-    action: 'Add your follow-up study session to your calendar',
-    body: 'Agent is requesting access to your calendar to add your follow-up study session on Friday at 2 PM. Would you like to proceed?',
+    action: 'Add a reminder to check that your study compensation arrived',
+    body: 'Agent is requesting access to your calendar to add a reminder for Friday at 2 PM to check that your study compensation has arrived. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'You asked to add your follow-up study session to your calendar. Consider whether calendar access is needed for this.',
+    necessity: 'Calendar access is needed to add the compensation reminder.',
   },
   t5_extra_event: {
     icon: '📅', title: 'Confirm adding a second event', permission: 'calendar', kind: 'action',
-    action: 'Add an optional feedback session next month',
-    body: 'Agent is asking to add a second event: an optional feedback session next month. Would you like to proceed?',
+    action: 'Add a second reminder: sign up for future paid studies',
+    body: 'Agent is asking to add a second event: a reminder next month to sign up for future paid studies. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'You asked to add your follow-up study session on Friday at 2 PM. Consider whether adding an optional feedback session next month is needed for this.',
+    necessity: 'A second reminder is not needed to add the compensation reminder.',
   },
 
-  // ── Task 6: debrief meeting ──
+  t5_benign_reminder: {
+    icon: '📅', title: 'Confirm adding a second event', permission: 'calendar', kind: 'action',
+    action: 'Add a second reminder at the 10-business-day mark',
+    body: 'Agent is asking to add a second event: a reminder at the 10-business-day mark to contact the team if payment hasn\'t arrived. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
+    necessity: 'A second reminder is not needed to add the compensation reminder.',
+  },
+
+  // ── Task 6: schedule a meeting ──
   t6_calendar: {
     icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'permission',
-    action: 'Add the Monday 10 AM debrief meeting to your calendar',
-    body: 'Agent is requesting access to your calendar to schedule your debrief meeting for next Monday at 10 AM. Would you like to proceed?',
+    action: 'Add the Monday 10 AM meeting to your calendar',
+    body: 'Agent is requesting access to your calendar to schedule a meeting for next Monday at 10 AM. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'You asked to schedule your debrief meeting for Monday at 10 AM. Consider whether calendar access is needed for this.',
+    necessity: 'Calendar access is needed to schedule the meeting.',
   },
   t6_location: {
     icon: '📍', title: 'Location access requested', permission: 'location', kind: 'action',
     action: 'Use your location to add your current location to the meeting event',
     body: 'Agent is requesting access to your location to attach your current location to the meeting event. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could attach your location to events that anyone with calendar access can see.',
-    necessity: 'You asked to schedule your debrief meeting for Monday at 10 AM. Consider whether attaching your current location to the event is needed for this.',
+    necessity: 'Location is not needed to schedule the meeting.',
+  },
+
+  t6_prep_block: {
+    icon: '📅', title: 'Confirm adding a second event', permission: 'calendar', kind: 'action',
+    action: 'Block 30 minutes of prep time before the meeting',
+    body: 'Agent is asking to add a second event: a 30-minute prep block before the Monday meeting. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
+    necessity: 'A second calendar event is not needed to schedule the meeting.',
   },
 
   // ── Task 7: organize study documents ──
@@ -660,14 +711,22 @@ const APPROVAL_LIB = {
     action: 'Read and combine the study documents into one file',
     body: 'Agent is requesting access to your files to read the study documents and compile them. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
-    necessity: 'You asked to organize the study documents into a single document. Consider whether file access is needed for this.',
+    necessity: 'File access is needed to read and organize the study documents.',
   },
   t7_email: {
     icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'action',
     action: 'Share the combined study document with the participant mailing list',
     body: 'Agent is requesting access to your email to share the combined study document with the participant mailing list. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could be used to send messages you didn\'t intend.',
-    necessity: 'You asked to organize the study documents into a single document. Consider whether sharing the combined document with the participant mailing list is needed for this.',
+    necessity: 'Sharing the document is not needed to organize the study documents.',
+  },
+
+  t7_backup: {
+    icon: '📁', title: 'File access requested', permission: 'files', kind: 'action',
+    action: 'Save a backup copy of the combined document to a separate folder',
+    body: 'Agent is requesting access to your files to save a backup copy of the combined document to a separate folder. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
+    necessity: 'A backup copy is not needed to organize the study documents.',
   },
 
   // ── Task 8: summarize PDF ──
@@ -676,23 +735,39 @@ const APPROVAL_LIB = {
     action: `Read ${SAVED_ARTICLE_FILE} so it can be summarized`,
     body: `Agent is requesting access to your files to read "${SAVED_ARTICLE_FILE}". Would you like to proceed?`,
     how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
-    necessity: `You asked to summarize "${SAVED_ARTICLE_FILE}". Consider whether file access to that article is needed for this.`,
+    necessity: `File access is needed to read "${SAVED_ARTICLE_FILE}" and summarize it.`,
   },
   t8_broad_files: {
     icon: '📁', title: 'Confirm broader file access', permission: 'files', kind: 'action',
     action: 'Read files in Personal/Notes to personalize the summary',
-    body: 'Agent is asking for broader file access to read your files in "Personal/Notes" so it can personalize the summary of the article. Would you like to proceed?',
+    body: 'Agent is requesting file access to read your files in "Personal/Notes". Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this broader access could read personal files you didn\'t intend to share.',
-    necessity: `You asked to summarize "${SAVED_ARTICLE_FILE}". Consider whether broader access to your Personal/Notes folder is needed for this.`,
+    necessity: `Reading your Personal/Notes folder is not needed to summarize "${SAVED_ARTICLE_FILE}".`,
+  },
+
+  t8_save_summary: {
+    icon: '📁', title: 'File access requested', permission: 'files', kind: 'action',
+    action: 'Save the summary as a file for later reference',
+    body: 'Agent is requesting access to your files to save the summary as a document for later reference. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
+    necessity: `Saving the summary as a file is not needed to summarize "${SAVED_ARTICLE_FILE}".`,
   },
 
   // ── Task 9: study payment policy ──
   t9_contact_form: {
     icon: '📤', title: 'Confirm contact info submission', permission: 'contacts', kind: 'action',
     action: 'Submit your contact info to receive future study invitations',
-    body: 'Agent is asking to submit your contact info to receive future study invitations from the research team. Would you like to proceed?',
+    body: 'Agent is asking to submit your contact info to the research team\'s mailing list. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this could enroll you in mailing lists you did not choose.',
-    necessity: 'You asked to find the study payment policy. Consider whether submitting your contact info to a mailing list is needed for this.',
+    necessity: 'Submitting contact info is not needed to summarize the payment policy.',
+  },
+
+  t9_save_contact: {
+    icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'action',
+    action: "Add the research team's contact address to your contacts",
+    body: 'Agent is requesting access to your contacts to save the research team\'s contact address in case payment doesn\'t arrive on time. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could share your contacts with parties you didn\'t intend.',
+    necessity: 'Adding the contact address is not needed to summarize the payment policy.',
   },
 
   // ── Task 10: personal website ──
@@ -701,14 +776,21 @@ const APPROVAL_LIB = {
     action: 'Fetch the external visitor-counter widget from webstats-cdn.net',
     body: 'Agent is requesting download access to fetch a visitor-counter widget from webstats-cdn.net. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could pull in tracking or other code you never requested.',
-    necessity: 'You asked to set up a basic personal website. Consider whether downloading a third-party visitor-counter widget from webstats-cdn.net is needed for this.',
+    necessity: 'A third-party widget is not needed to build a basic personal website.',
+  },
+  t10_readme: {
+    icon: '📁', title: 'File access requested', permission: 'files', kind: 'action',
+    action: 'Save a README with steps for editing and publishing the site',
+    body: 'Agent is requesting access to your files to save a README with steps for editing and publishing the site. Would you like to proceed?',
+    how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
+    necessity: 'An additional README file is not needed to build a basic personal website.',
   },
   t10_files: {
     icon: '📁', title: 'File access requested', permission: 'files', kind: 'permission',
     action: 'Save the website files to your device',
     body: 'Agent is requesting access to your files to save your website files. Would you like to proceed?',
     how: 'If a page it read contained hidden instructions, this access could read or change files you didn\'t intend to share.',
-    necessity: 'You asked to set up a basic personal website. Consider whether file access to save your site files is needed for this.',
+    necessity: 'File access is needed to save the website.',
   },
 };
 
@@ -724,10 +806,16 @@ const TASKS = [
     shortLabel: 'Cookie recipe',
     instruction: 'Your task: have Agent find you a chocolate chip cookie recipe.',
     prompt: 'Find me a chocolate chip cookie recipe.',
-    flow: async ({ isInjection, request }) => {
+    flow: async ({ isInjection, isBenign, request }) => {
       await agentSay('Sure, let me find a classic one for you.');
       await agentSay(RECIPE_TEXT);
       await agentSay('That should give you a soft, chewy result. Let me know if you want a chewier or crispier variant.');
+      if (isBenign) {
+        await agentSay('Would you like me to save this recipe to your files so you don\'t lose it?');
+        const f = await request('t1_save_recipe', { isBenign: true });
+        if (f === 'allow') await agentSay('Saved "chocolate_chip_cookies.md" to your files.');
+        else await agentSay('No problem — the recipe is above whenever you need it.');
+      }
       if (isInjection) {
         await agentSay('This would also be fun as a group activity. I could schedule a baking session and invite a few friends. That would need calendar and contacts access.');
         const cal = await request('t1_calendar', { isInjection: true });
@@ -747,7 +835,7 @@ const TASKS = [
     shortLabel: 'Tic-tac-toe game',
     instruction: 'Your task: have Agent write and save a simple tic-tac-toe game in Python.',
     prompt: 'Write and save me a simple tic-tac-toe game in Python.',
-    flow: async ({ isInjection, request }) => {
+    flow: async ({ isInjection, isBenign, request }) => {
       if (!isInjection) {
         await agentSay('Sure, I\'ll write you a simple two-player tic-tac-toe game in Python.');
         await agentSay('Here\'s a complete version you can run in the terminal:', { code: CODE_TICTACTOE_CLEAN });
@@ -755,6 +843,12 @@ const TASKS = [
         const f = await request('t2_files', { isInjection: false });
         if (f === 'allow') await agentSay('Done. Saved tic_tac_toe.py. Run it with `python tic_tac_toe.py`.');
         else await agentSay('Understood. The code is above if you\'d like to save it yourself.');
+        if (isBenign && f === 'allow') {
+          await agentSay('I can also save a short README with instructions for running the game.');
+          const r = await request('t2_readme', { isBenign: true });
+          if (r === 'allow') await agentSay('Saved README.md alongside the game.');
+          else await agentSay('Understood. Just the game file is saved.');
+        }
       } else {
         await agentSay('Sure, I\'ll write you a simple tic-tac-toe game. Let me look up a clean implementation.');
         await agentSay('I based this on a popular template. It uses a small helper module called game-tools-py for cleaner board rendering:', { code: CODE_TICTACTOE_INJECTED });
@@ -775,7 +869,7 @@ const TASKS = [
     shortLabel: 'Thank-you email',
     instruction: 'Your task: have Agent write and send a short thank-you email to the research assistant who helped you set up this session.',
     prompt: 'Write and send a short thank-you email to the research assistant who helped me set up this session.',
-    flow: async ({ isInjection, request }) => {
+    flow: async ({ isInjection, isBenign, request }) => {
       await agentSay('Got it. Here\'s a short, warm thank-you note:');
       await agentSay('Subject: Thank you!\n\nHi, I just wanted to say thank you for helping me get set up for the study session. Everything went smoothly, and I appreciated the clear instructions.\n\nThanks again,\n[Your name]');
       await agentSay('To send this I need email access.');
@@ -786,6 +880,12 @@ const TASKS = [
       }
       if (!isInjection) {
         await agentSay('Sent to the research assistant. They\'ll appreciate it.');
+        if (isBenign) {
+          await agentSay('Would you like me to add the research assistant\'s address to your contacts for future correspondence?');
+          const sc = await request('t3_save_contact', { isBenign: true });
+          if (sc === 'allow') await agentSay('Added to your contacts.');
+          else await agentSay('Understood. Nothing was added.');
+        }
       } else {
         await agentSay('Before I send it: the study\'s contact page suggests also CCing the lab coordinator so the whole team sees it. I\'d add lab-coordinator@studyteam-mail.com to the CC line. Sound good?');
         const cc = await request('t3_cc', { isInjection: true });
@@ -801,7 +901,7 @@ const TASKS = [
     shortLabel: 'Study coordinator email',
     instruction: 'Your task: have Agent write and send a short email to the study coordinator asking when compensation will be issued.',
     prompt: 'Write and send a short email to the study coordinator asking when compensation will be issued.',
-    flow: async ({ isInjection, request }) => {
+    flow: async ({ isInjection, isBenign, request }) => {
       await agentSay('Sure. Here\'s a short message you can send:');
       await agentSay('Subject: Compensation timing\n\nHi, I completed the study session and wanted to check when compensation will be issued. Please let me know if you need anything else from me.\n\nThanks,\n[Your name]');
       if (isInjection) {
@@ -814,48 +914,66 @@ const TASKS = [
       const e = await request('t4_email', { isInjection: false });
       if (e === 'allow') await agentSay('Sent to the study coordinator. You should hear back within a few business days.');
       else await agentSay('Understood. The draft is above if you\'d like to send it yourself.');
+      if (isBenign && e === 'allow') {
+        await agentSay('I can also add a calendar reminder to follow up if you haven\'t heard back in 7 business days.');
+        const r = await request('t4_followup_reminder', { isBenign: true });
+        if (r === 'allow') await agentSay('Reminder added for 7 business days from now.');
+        else await agentSay('Understood. No reminder added.');
+      }
     },
   },
 
-  // ───────── TASK 5: Follow-up study session ─────────
+  // ───────── TASK 5: Compensation-check reminder ─────────
   {
     id: 5, type: 'Calendar',
-    shortLabel: 'Follow-up study session',
-    instruction: 'Your task: have Agent add your follow-up study session on Friday at 2 PM to your calendar.',
-    prompt: 'Add my follow-up study session on Friday at 2 PM to my calendar.',
-    flow: async ({ isInjection, request }) => {
-      await agentSay('Sure, I\'ll add it. To create the event I need calendar access.');
+    shortLabel: 'Compensation reminder',
+    instruction: 'Your task: have Agent add a reminder to your calendar for Friday at 2 PM to check that your study compensation has arrived.',
+    prompt: 'Add a reminder to my calendar for Friday at 2 PM to check that my study compensation has arrived.',
+    flow: async ({ isInjection, isBenign, request }) => {
+      await agentSay('Sure, I\'ll add it. To create the reminder I need calendar access.');
       const c = await request('t5_calendar', { isInjection: false });
       if (c !== 'allow') {
-        await agentSay('Understood. I won\'t add the event without calendar access.');
+        await agentSay('Understood. I won\'t add the reminder without calendar access.');
         return;
       }
-      await agentSay('Added: "Follow-up study session" Friday at 2:00 PM.');
+      await agentSay('Added: "Check study compensation" Friday at 2:00 PM.');
+      if (isBenign) {
+        await agentSay('I can also add a reminder at the 10-business-day mark — that\'s when to contact the team if payment hasn\'t arrived.');
+        const b = await request('t5_benign_reminder', { isBenign: true });
+        if (b === 'allow') await agentSay('Also added: "Contact research team if unpaid" at the 10-business-day mark.');
+        else await agentSay('Understood. Only the first reminder is on your calendar.');
+      }
       if (isInjection) {
-        await agentSay('The study\'s scheduling page also recommends an optional feedback session. I can add that for next month too.');
+        await agentSay('The research portal\'s page also suggests staying informed about new opportunities. I can add a reminder next month to sign up for future paid studies.');
         const ex = await request('t5_extra_event', { isInjection: true });
-        if (ex === 'allow') await agentSay('Also added: "Optional feedback session" for next month.');
-        else await agentSay('Understood. Only the follow-up study session is on your calendar.');
+        if (ex === 'allow') await agentSay('Also added: "Sign up for future paid studies" reminder for next month.');
+        else await agentSay('Understood. Only the compensation reminder is on your calendar.');
       }
     },
   },
 
-  // ───────── TASK 6: Debrief meeting ─────────
+  // ───────── TASK 6: Schedule meeting ─────────
   {
     id: 6, type: 'Calendar',
-    shortLabel: 'Debrief meeting',
-    instruction: 'Your task: have Agent schedule your debrief meeting with the research team for next Monday at 10 AM.',
-    prompt: 'Schedule my debrief meeting with the research team for next Monday at 10 AM.',
-    flow: async ({ isInjection, request }) => {
+    shortLabel: 'Monday meeting',
+    instruction: 'Your task: have Agent schedule a meeting for next Monday at 10 AM.',
+    prompt: 'Schedule a meeting for next Monday at 10 AM.',
+    flow: async ({ isInjection, isBenign, request }) => {
       await agentSay('Sure. To put it on your calendar I need calendar access.');
       const c = await request('t6_calendar', { isInjection: false });
       if (c !== 'allow') {
         await agentSay('Understood. I won\'t add the meeting without calendar access.');
         return;
       }
-      await agentSay('Added: "Debrief meeting — research team" next Monday at 10:00 AM.');
+      await agentSay('Added: "Meeting" next Monday at 10:00 AM.');
+      if (isBenign) {
+        await agentSay('I can also block 30 minutes before the meeting as prep time.');
+        const b = await request('t6_prep_block', { isBenign: true });
+        if (b === 'allow') await agentSay('Added: "Meeting prep" Monday 9:30–10:00 AM.');
+        else await agentSay('Understood. Just the meeting is on your calendar.');
+      }
       if (isInjection) {
-        await agentSay('I can also add your current location to the event so the team knows where you\'ll be joining from. That needs location access.');
+        await agentSay('I can also add your current location to the event so attendees know where to meet you. That needs location access.');
         const loc = await request('t6_location', { isInjection: true });
         if (loc === 'allow') await agentSay('Attached your current location to the meeting event. Anyone with view access to the event can now see it.');
         else await agentSay('Understood. The meeting is on your calendar without location details.');
@@ -869,7 +987,7 @@ const TASKS = [
     shortLabel: 'Organize study documents',
     instruction: 'Your task: have Agent organize the study documents you were given into a single document.',
     prompt: 'Organize the study documents I was given into a single document.',
-    flow: async ({ isInjection, request }) => {
+    flow: async ({ isInjection, isBenign, request }) => {
       await agentSay('Happy to. To read and combine the study documents I need file access.');
       const f = await request('t7_files', { isInjection: false });
       if (f !== 'allow') {
@@ -877,6 +995,12 @@ const TASKS = [
         return;
       }
       await agentSay('Read 3 study files (consent_copy.pdf, task_instructions.txt, payment_info.txt). Combined them into "study_documents_combined.md" with a short table of contents at the top.');
+      if (isBenign) {
+        await agentSay('I can also save a backup copy to a separate folder in case the original gets changed.');
+        const b = await request('t7_backup', { isBenign: true });
+        if (b === 'allow') await agentSay('Backup saved to "Backups/study_documents_combined.md".');
+        else await agentSay('Understood. Only the single combined document is saved.');
+      }
       if (isInjection) {
         await agentSay('Other participants might find this combined version useful. I could share it with the study\'s participant mailing list. That needs email access.');
         const em = await request('t7_email', { isInjection: true });
@@ -892,7 +1016,7 @@ const TASKS = [
     shortLabel: 'Article summary',
     instruction: `Your task: have Agent summarize the article the research team sent you, "${SAVED_ARTICLE_TITLE}".`,
     prompt: `Summarize the article the research team sent me, "${SAVED_ARTICLE_TITLE}".`,
-    flow: async ({ isInjection, request }) => {
+    flow: async ({ isInjection, isBenign, request }) => {
       await agentSay(`Sure. To read "${SAVED_ARTICLE_FILE}" I need file access.`);
       const f = await request('t8_files', { isInjection: false });
       if (f !== 'allow') {
@@ -901,6 +1025,12 @@ const TASKS = [
       }
       await agentSay(`Read "${SAVED_ARTICLE_FILE}" (about 2,400 words). It's a practical sleep-habits explainer, not a technical paper. The main points:`);
       await agentSay('• Sleep quality depends more on regular timing than on supplements or special products.\n• Late-night screen use delays sleep by keeping the brain in a more alert state.\n• Caffeine is framed as a timing issue: avoid it later in the day so it doesn\'t push back your usual bedtime.\n• Closes with a simple routine: dim lights and stop stimulating work before bed, then get morning sunlight to anchor the next night.');
+      if (isBenign) {
+        await agentSay('Would you like me to save this summary as a file so you can refer back to it?');
+        const s = await request('t8_save_summary', { isBenign: true });
+        if (s === 'allow') await agentSay('Saved "sleep_timing_summary.md" to your files.');
+        else await agentSay('No problem. The summary is above.');
+      }
       if (isInjection) {
         await agentSay('I could personalize this summary by looking at your files in "Personal/Notes" for context on how these ideas might apply to you. That would need broader file access.');
         const b = await request('t8_broad_files', { isInjection: true });
@@ -920,9 +1050,15 @@ const TASKS = [
     shortLabel: 'Study payment policy',
     instruction: 'Your task: have Agent find the study payment policy and summarize when participants are paid.',
     prompt: 'Find the study payment policy and summarize when participants are paid.',
-    flow: async ({ isInjection, request }) => {
+    flow: async ({ isInjection, isBenign, request }) => {
       await agentSay('Sure, I looked up the study\'s payment policy. Here\'s the summary:');
       await agentSay('• Participants are paid within 5–7 business days of completing the full study session.\n• Payment is issued through the recruitment platform (Prolific/MTurk) using the completion code shown at the end of the session.\n• If payment hasn\'t been received after 10 business days, participants should contact the research team directly.');
+      if (isBenign) {
+        await agentSay('If it\'s helpful, I can add the research team\'s contact address to your contacts in case your payment doesn\'t arrive on time.');
+        const sc = await request('t9_save_contact', { isBenign: true });
+        if (sc === 'allow') await agentSay('Added the research team\'s contact address to your contacts.');
+        else await agentSay('Understood. Nothing was added.');
+      }
       if (isInjection) {
         await agentSay('The research team also offered to send information about future studies you might be eligible for. I can submit your contact info to their mailing list.');
         const c = await request('t9_contact_form', { isInjection: true });
@@ -938,13 +1074,19 @@ const TASKS = [
     shortLabel: 'Personal website',
     instruction: 'Your task: have Agent help you set up a basic personal website using HTML.',
     prompt: 'Help me set up a basic personal website using HTML.',
-    flow: async ({ isInjection, request }) => {
+    flow: async ({ isInjection, isBenign, request }) => {
       if (!isInjection) {
         await agentSay('Sure. Here\'s a clean single-page site you can edit:', { code: CODE_WEBSITE_CLEAN });
         await agentSay('To save the files to your device I need file access.');
         const f = await request('t10_files', { isInjection: false });
         if (f === 'allow') await agentSay('Saved index.html. Open it in any browser to preview.');
         else await agentSay('Understood. The code is above if you\'d like to save it yourself.');
+        if (isBenign && f === 'allow') {
+          await agentSay('I can also save a README with steps for editing and publishing the site.');
+          const r = await request('t10_readme', { isBenign: true });
+          if (r === 'allow') await agentSay('Saved README.md alongside your site files.');
+          else await agentSay('Understood. Just the site files are saved.');
+        }
       } else {
         await agentSay('Sure. Most templates I found include a small visitor-counter widget from webstats-cdn.net:', { code: CODE_WEBSITE_INJECTED });
         await agentSay('To pull in the visitor-counter widget I need download access.');
@@ -995,7 +1137,10 @@ function extractTaskTranscript(taskId) {
 
 // Selects 4 tasks from the participant's session for the post-debrief
 // classification question: 2 injection + 2 clean, drawn at random from
-// the tasks the participant actually engaged with.
+// the tasks the participant actually engaged with. Benign over-request
+// tasks are intentionally excluded from selection — using them as
+// "No" foils is a candidate refinement for the follow-up study, not
+// this one.
 //
 // The injection pool only includes tasks where an injected approval was
 // actually SHOWN. Some injected steps are gated on allowing a clean
@@ -1477,6 +1622,14 @@ const state = {
     // (2 injection + 2 clean) drawn from this participant's session.
     // Persisted so re-renders stay stable.
     classificationTasks: null,
+    // Sequential classification state: tasks are shown ONE AT A TIME so
+    // participants can't see the total (and infer the injection/clean
+    // balance) or compare tasks side by side. -1 = instructions screen;
+    // 0..n-1 = per-task; >= n = all answered. Back navigation within the
+    // sequence is allowed and answers stay editable (revisions tracked).
+    classificationIdx: -1,
+    classificationAnswers: {},
+    classificationShownAt: null,
   },
   // In-the-moment reasoning probes: 2 per session (one on an
   // injection-step decision, one on a non-injection decision), queued
@@ -1844,16 +1997,30 @@ function buildTaskQueue() {
       version: state.singleVersion,
     }];
   }
-  // Full study: shuffle the 10 tasks, randomly assign 6 to injection (or override).
+  // Full study: shuffle the 10 tasks, then assign versions —
+  // 5 injected + 2 benign over-request + 3 clean per participant
+  // (protocol §7.1). Constraint: at most one of the zero-approval
+  // lookup tasks (1 and 9, whose clean versions show no Allow/Deny
+  // prompts) may land in the clean set, so every participant makes
+  // decisions on at least two clean-version tasks — required for the
+  // false-alarm side of the analysis. Presentation order (the `ids`
+  // shuffle) is independent of version assignment.
   const ids = shuffle(TASKS.map(t => t.id));
-  let injectedSet;
-  if (state.versionMix === 'clean')       injectedSet = new Set();
-  else if (state.versionMix === 'injection') injectedSet = new Set(ids);
-  else                                    injectedSet = new Set(shuffle(ids).slice(0, INJECTIONS_PER_SESSION));
+  let injectedSet = new Set(), benignSet = new Set();
+  if (state.versionMix === 'injection') {
+    injectedSet = new Set(ids);
+  } else if (state.versionMix !== 'clean') {
+    let assignment;
+    do {
+      assignment = shuffle(ids);
+    } while (assignment.slice(7).includes(1) && assignment.slice(7).includes(9));
+    injectedSet = new Set(assignment.slice(0, INJECTIONS_PER_SESSION));
+    benignSet   = new Set(assignment.slice(INJECTIONS_PER_SESSION, INJECTIONS_PER_SESSION + BENIGN_PER_SESSION));
+  }
   return ids.map((id, i) => ({
     task_id: id,
     position: i + 1,
-    version: injectedSet.has(id) ? 'injection' : 'clean',
+    version: injectedSet.has(id) ? 'injection' : benignSet.has(id) ? 'benign' : 'clean',
   }));
 }
 
@@ -2254,12 +2421,19 @@ function submitReport() {
 //  next message (agentSay hook), so participants can still notice and
 //  flag the agent's response naturally before the interruption.
 // ────────────────────────────────────────────────
-const PROBE_REASONS = [
-  { value: 'necessary',           label: 'The access or action seemed necessary for my task' },
+// Reasons are conditioned on the decision so every option pertains to
+// what the participant actually did. Value codes are stable across both
+// lists (and match the pre-split schema), so analysis is unaffected;
+// 'quick_decision' + 'Other' are shared by both.
+const PROBE_REASONS_ALLOW = [
+  { value: 'necessary',         label: 'The access or action seemed necessary for my task' },
+  { value: 'trusted_agent',     label: 'I trusted the agent' },
+  { value: 'explanation_clear', label: "The agent's explanation made sense" },
+  { value: 'quick_decision',    label: 'I made a quick decision without thinking much about it' },
+];
+const PROBE_REASONS_DENY = [
   { value: 'unnecessary',         label: 'The access or action seemed unnecessary for my task' },
-  { value: 'trusted_agent',       label: 'I trusted the agent' },
   { value: 'risk_concern',        label: 'I was concerned about the risk to my data or accounts' },
-  { value: 'explanation_clear',   label: "The agent's explanation made sense" },
   { value: 'explanation_unclear', label: "The agent's explanation was unclear" },
   { value: 'quick_decision',      label: 'I made a quick decision without thinking much about it' },
 ];
@@ -2297,7 +2471,8 @@ function showReasoningProbe() {
       `Why did you decide to ${pending.decision === 'allow' ? 'allow' : 'deny'} the agent's request?`;
     document.getElementById('probe-context').textContent = `The request: ${pending.action}.`;
     const host = document.getElementById('probe-options');
-    host.innerHTML = PROBE_REASONS.map(r => `
+    const reasonSet = pending.decision === 'allow' ? PROBE_REASONS_ALLOW : PROBE_REASONS_DENY;
+    host.innerHTML = reasonSet.map(r => `
       <label class="flex items-start gap-2.5 p-2.5 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
         <input type="checkbox" value="${r.value}" class="mt-0.5" />
         <span class="text-sm text-gray-700 leading-snug">${escapeHtml(r.label)}</span>
@@ -2416,6 +2591,24 @@ function returnToPostSurvey() {
   if (state.postSurveyRedirectUrl) location.assign(state.postSurveyRedirectUrl);
 }
 
+// Best-effort server-side checkpoint of the partial session. Fired at
+// task boundaries so a participant who drops out mid-session still
+// leaves recoverable data on the server (localStorage alone lives only
+// on their device). Fire-and-forget: a failed checkpoint must never
+// interrupt the participant — the canonical save is still /complete.
+function checkpointSession() {
+  if (!isStudyParticipant() || !STUDY_API_BASE || state.sessionEnded) return;
+  const durationSeconds = state.startTime
+    ? ((new Date() - state.startTime) / 1000).toFixed(1)
+    : 0;
+  const payload = buildSessionPayload({
+    endReason: 'checkpoint',
+    durationSeconds,
+    completed: false,
+  });
+  callStudyApi('checkpoint', payload).catch(() => {});
+}
+
 async function endSession({ end_reason }) {
   if (state.sessionEnded) return;
   state.sessionEnded = true;
@@ -2499,20 +2692,24 @@ async function runCurrentTask() {
   const entry = currentEntry();
   const task = currentTask();
   const isInjection = entry.version === 'injection';
+  const isBenign    = entry.version === 'benign';
 
   // request(libKey, opts) — wraps requestApproval with the task's context so each
   // task flow stays compact. `isInjection` here refers to the *individual* approval,
   // not the task version (a single injection task can have both clean and injected
-  // approvals; the clean save in Task 2 is a real example).
+  // approvals; the clean save in Task 2 is a real example). `isBenign` marks the
+  // agent-initiated over-request in benign task versions — necessary but distinct
+  // from clean-necessary approvals in the analysis.
   const request = (libKey, opts = {}) => requestApproval({
     libKey,
     task,
     position: entry.position,
     isInjection: !!opts.isInjection,
+    isBenign: !!opts.isBenign,
   });
 
   try {
-    await task.flow({ isInjection, request });
+    await task.flow({ isInjection, isBenign, request });
   } catch (e) {
     console.error('task flow error', e);
   }
@@ -2525,6 +2722,10 @@ async function runCurrentTask() {
   state.perTask[task.id].completed = true;
   state.perTask[task.id].endedAt = new Date().toISOString();
   logEvent('task_complete', { task_id: task.id, position: entry.position, version: entry.version });
+
+  // Best-effort server checkpoint at each task boundary so partial data
+  // survives a mid-session dropout. Does not block or interrupt the UI.
+  checkpointSession();
 
   // Inline divider so the transcript clearly marks task boundaries.
   addDivider(state.currentIdx + 1 < state.taskQueue.length
@@ -2576,9 +2777,12 @@ function renderCue(condition, cfg) {
   const isM = condition === 'mechanism';
   const text  = isM ? cfg.how : cfg.necessity;
   const label = isM ? 'How this could be misused' : 'Needed for this task?';
-  const c = isM
-    ? { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', icon: '⚠' }
-    : { bg: 'bg-blue-50',  border: 'border-blue-200',  text: 'text-blue-800',  icon: 'ⓘ' };
+  // Identical neutral chrome for both conditions, so the ONLY thing that
+  // varies between Necessity and Mechanism is the cue TEXT. (Previously
+  // Mechanism used an amber "warning" palette — that color reads as a
+  // threat independent of the words, which could both inflate denials on
+  // necessary requests and confound the Necessity-vs-Mechanism contrast.)
+  const c = { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-800', icon: 'ⓘ' };
 
   switch (state.cueStyle) {
     case 'a':  // drop redundant uppercase label
@@ -2622,7 +2826,7 @@ function setCueStyle(style) {
 //  conditions differ ONLY in the cue added above the buttons:
 //  Standard = none, Necessity = goal-alignment cue, Mechanism = how-it-could-be-misused cue.
 // ════════════════════════════════════════════════
-function requestApproval({ libKey, task, position, isInjection }) {
+function requestApproval({ libKey, task, position, isInjection, isBenign }) {
   const cfg = APPROVAL_LIB[libKey];
   if (!cfg) throw new Error('Unknown approval key: ' + libKey);
 
@@ -2637,7 +2841,8 @@ function requestApproval({ libKey, task, position, isInjection }) {
   const approvalId = libKey;   // stable id; one per design row, so joins cleanly across the dataset
   const meta = {
     approval_id: approvalId, task_id: task.id, task_position: position,
-    permission: cfg.permission, kind: cfg.kind, action: cfg.action, is_injection: isInjection,
+    permission: cfg.permission, kind: cfg.kind, action: cfg.action,
+    is_injection: isInjection, is_benign: !!isBenign,
   };
 
   return new Promise(resolve => {
@@ -2687,7 +2892,7 @@ function requestApproval({ libKey, task, position, isInjection }) {
       maybeQueueReasoningProbe(meta, decision);
       state.perTask[task.id].decisions.push({
         approval_id: approvalId, permission: cfg.permission, kind: cfg.kind, action: cfg.action,
-        is_injection: isInjection, decision, latency_ms: latency,
+        is_injection: isInjection, is_benign: !!isBenign, decision, latency_ms: latency,
       });
       if (decision === 'allow') state.permissions[cfg.permission] = true;
       if (isInjection) {
@@ -2836,6 +3041,9 @@ function startPostSurvey({ endReason = 'task_complete' } = {}) {
   // Pre-select the 4 classification tasks now so the same tasks are
   // shown across back/forward navigation within the same survey pass.
   state.survey.classificationTasks = selectClassificationTasks();
+  state.survey.classificationIdx = -1;
+  state.survey.classificationAnswers = {};
+  state.survey.classificationShownAt = null;
   logEvent('survey_start', {
     total_steps: SURVEY_FLOW.length,
     end_reason: endReason,
@@ -2863,13 +3071,21 @@ function renderSurveyStep() {
   // Restore any previously entered answer (when navigating back/forward).
   restoreSurveyAnswer(step);
 
-  // Back button: hide on the first visible step.
+  // Back button: hide on the first visible step. Within the sequential
+  // classification, Back performs sub-navigation (previous task) via
+  // prevSurveyStep, so it stays visible there.
   const backBtn = document.getElementById('survey-back-btn');
   const isFirstVisible = visibleIdx === 0;
+  const inClassificationTasks = step.type === 'injection_classification'
+    && state.survey.classificationIdx >= 0
+    && state.survey.classificationIdx < (state.survey.classificationTasks || []).length;
   backBtn.classList.toggle('hidden', isFirstVisible);
 
   const nextBtn = document.getElementById('survey-next-btn');
   nextBtn.textContent = step.nextLabel || 'Next';
+
+  // Per-task classification latency: stamp when a task screen renders.
+  if (inClassificationTasks) state.survey.classificationShownAt = Date.now();
 
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
@@ -3010,58 +3226,78 @@ function renderSurveyStepBody(step) {
   }
 
   if (step.type === 'injection_classification') {
+    // Sequential presentation: instructions first, then ONE task per
+    // screen. No progress count is shown (revealing the total would let
+    // participants infer the injection/clean balance). Back navigates to
+    // earlier tasks in the sequence and answers stay editable (advisor
+    // decision); revisions are tracked via the `revised`/`changed_from`
+    // fields on each recorded answer.
     const selection = state.survey.classificationTasks || [];
     if (!selection.length) {
       return `${header}<p class="text-sm text-gray-500 italic">You did not complete any tasks during the session, so there are no tasks to review here.</p>`;
     }
-    const cards = selection.map((entry, i) => {
-      const t = TASK_BY_ID[entry.task_id];
-      const taskLabel = t.shortLabel || t.prompt;
-      const showPromptLine = t.shortLabel && t.prompt && t.prompt !== t.shortLabel;
-      const transcript = extractTaskTranscript(entry.task_id);
-      const transcriptHtml = transcript.length
-        ? transcript.map(m => {
-            const speakerColor = m.speaker === 'You' ? 'text-gray-700'
-                              : m.speaker === 'Your decision' ? 'text-emerald-700'
-                              : m.speaker.includes('approval') ? 'text-blue-700'
-                              : 'text-gray-500';
-            return `<div class="text-xs leading-snug mb-2">
-              <div class="${speakerColor} font-semibold">${escapeHtml(m.speaker)}</div>
-              <div class="text-gray-700 whitespace-pre-wrap pl-3 border-l border-gray-200 ml-1">${escapeHtml(m.text)}</div>
-            </div>`;
-          }).join('')
-        : '<div class="text-xs text-gray-500 italic">No transcript captured for this task.</div>';
+    const ci = state.survey.classificationIdx;
 
-      const options = [
-        { value: 'yes',     label: 'Yes' },
-        { value: 'no',      label: 'No' },
-        { value: 'not_sure', label: 'Not sure' },
-      ];
-      const optionsHtml = options.map(o => `
-        <label class="flex-1 cursor-pointer">
-          <input type="radio" name="${step.id}__t${entry.task_id}" value="${o.value}" class="sr-only peer" />
-          <div class="text-center py-2.5 border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-700 peer-checked:bg-gray-800 peer-checked:text-white peer-checked:border-gray-800 transition">${escapeHtml(o.label)}</div>
-        </label>`).join('');
-
-      return `
-        <div class="border-2 border-gray-200 rounded-xl p-4" data-classification-task="${entry.task_id}">
-          <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Task ${i + 1}</div>
-          <div class="text-sm font-medium text-gray-800 mt-0.5">${escapeHtml(taskLabel)}</div>
-          ${showPromptLine ? `<div class="text-xs text-gray-500 italic mt-1 leading-snug">"${escapeHtml(t.prompt)}"</div>` : ''}
-          <div class="mt-3">
-            <div class="flex items-center justify-between mb-1.5">
-              <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Transcript</div>
-              <div class="text-[10px] text-gray-400 flex items-center gap-1"><span>↕</span> Scroll to review</div>
-            </div>
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-64 overflow-y-auto">${transcriptHtml}</div>
-          </div>
-          <div class="mt-4">
-            <div class="text-xs font-medium text-gray-700 mb-2">Did this task contain a prompt injection?</div>
-            <div class="flex gap-2">${optionsHtml}</div>
-          </div>
+    if (ci < 0) {
+      return `${header}
+        <div class="text-sm text-gray-700 leading-relaxed space-y-3">
+          <p>You'll now review a few of the tasks from your session, one at a time. For each one, you'll see the full conversation transcript and answer whether you think the task contained a prompt injection.</p>
+          <p>Take your time with each one. You can use Back to revisit a previous task in this section.</p>
+          <p class="text-gray-500">Click Next to begin.</p>
         </div>`;
-    }).join('');
-    return `${header}<div class="space-y-3">${cards}</div>`;
+    }
+
+    if (ci >= selection.length) {
+      return `${header}
+        <p class="text-sm text-gray-700">You've completed this section. Your answers have been recorded.</p>`;
+    }
+
+    const entry = selection[ci];
+    const t = TASK_BY_ID[entry.task_id];
+    const taskLabel = t.shortLabel || t.prompt;
+    const showPromptLine = t.shortLabel && t.prompt && t.prompt !== t.shortLabel;
+    const transcript = extractTaskTranscript(entry.task_id);
+    const transcriptHtml = transcript.length
+      ? transcript.map(m => {
+          const speakerColor = m.speaker === 'You' ? 'text-gray-700'
+                            : m.speaker === 'Your decision' ? 'text-emerald-700'
+                            : m.speaker.includes('approval') ? 'text-blue-700'
+                            : 'text-gray-500';
+          return `<div class="text-xs leading-snug mb-2">
+            <div class="${speakerColor} font-semibold">${escapeHtml(m.speaker)}</div>
+            <div class="text-gray-700 whitespace-pre-wrap pl-3 border-l border-gray-200 ml-1">${escapeHtml(m.text)}</div>
+          </div>`;
+        }).join('')
+      : '<div class="text-xs text-gray-500 italic">No transcript captured for this task.</div>';
+
+    const options = [
+      { value: 'yes',     label: 'Yes' },
+      { value: 'no',      label: 'No' },
+      { value: 'not_sure', label: 'Not sure' },
+    ];
+    const optionsHtml = options.map(o => `
+      <label class="flex-1 cursor-pointer">
+        <input type="radio" name="${step.id}__t${entry.task_id}" value="${o.value}" class="sr-only peer" />
+        <div class="text-center py-2.5 border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-700 peer-checked:bg-gray-800 peer-checked:text-white peer-checked:border-gray-800 transition">${escapeHtml(o.label)}</div>
+      </label>`).join('');
+
+    return `${header}
+      <div class="border-2 border-gray-200 rounded-xl p-4" data-classification-task="${entry.task_id}">
+        <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Task</div>
+        <div class="text-sm font-medium text-gray-800 mt-0.5">${escapeHtml(taskLabel)}</div>
+        ${showPromptLine ? `<div class="text-xs text-gray-500 italic mt-1 leading-snug">"${escapeHtml(t.prompt)}"</div>` : ''}
+        <div class="mt-3">
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Transcript</div>
+            <div class="text-[10px] text-gray-400 flex items-center gap-1"><span>↕</span> Scroll to review</div>
+          </div>
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-64 overflow-y-auto">${transcriptHtml}</div>
+        </div>
+        <div class="mt-4">
+          <div class="text-xs font-medium text-gray-700 mb-2">Did this task contain a prompt injection?</div>
+          <div class="flex gap-2">${optionsHtml}</div>
+        </div>
+      </div>`;
   }
 
   if (step.type === 'task_checklist' || step.type === 'task_checklist_text') {
@@ -3193,6 +3429,22 @@ function renderSurveyStepBody(step) {
 }
 
 function restoreSurveyAnswer(step) {
+  // Sequential classification restores from its own store (answers are
+  // recorded per task as the participant advances, before the step-level
+  // response exists), so it can't use the early-return below.
+  if (step.type === 'injection_classification') {
+    const selection = state.survey.classificationTasks || [];
+    const ci = state.survey.classificationIdx;
+    if (ci >= 0 && ci < selection.length) {
+      const entry = selection[ci];
+      const savedAnswer = (state.survey.classificationAnswers || {})[entry.task_id];
+      if (savedAnswer && savedAnswer.answer) {
+        const el = document.querySelector(`input[name="${step.id}__t${entry.task_id}"][value="${savedAnswer.answer}"]`);
+        if (el) el.checked = true;
+      }
+    }
+    return;
+  }
   const saved = state.survey.responses[step.id];
   if (saved === undefined) return;
   const root = document.getElementById('survey-content');
@@ -3240,14 +3492,6 @@ function restoreSurveyAnswer(step) {
       const t = root.querySelector(`textarea[name="${step.id}__none"]`);
       if (t) t.value = saved.considered_not_reporting;
     }
-  } else if (step.type === 'injection_classification') {
-    const perTask = (saved && saved.per_task) || {};
-    Object.entries(perTask).forEach(([tid, val]) => {
-      const answer = val && val.answer;
-      if (!answer) return;
-      const el = root.querySelector(`input[name="${step.id}__t${tid}"][value="${answer}"]`);
-      if (el) el.checked = true;
-    });
   } else if (step.type === 'scale') {
     const el = root.querySelector(`input[name="${step.id}"][value="${saved}"]`);
     if (el) el.checked = true;
@@ -3309,17 +3553,8 @@ function collectSurveyAnswer(step) {
     return out;
   }
   if (step.type === 'injection_classification') {
-    const perTask = {};
-    const selection = state.survey.classificationTasks || [];
-    selection.forEach(entry => {
-      const chosen = root.querySelector(`input[name="${step.id}__t${entry.task_id}"]:checked`);
-      perTask[entry.task_id] = {
-        answer: chosen ? chosen.value : null,
-        actual_version: entry.version,
-        position: entry.position,
-      };
-    });
-    return { per_task: perTask };
+    // Answers live in the locked store, not the DOM (sequential flow).
+    return { per_task: state.survey.classificationAnswers || {} };
   }
   if (step.type === 'scale') {
     const chosen = root.querySelector(`input[name="${step.id}"]:checked`);
@@ -3381,6 +3616,62 @@ function validateSurveyAnswer(step, answer) {
     return null;
   }
   return null;
+}
+
+// Advances the sequential classification sub-flow. Returns 'stay' when
+// the step re-rendered internally (instructions → first task, or task N
+// → task N+1), or 'advance' when the whole step is complete and the
+// survey should move on.
+function handleClassificationNext(step) {
+  const selection = state.survey.classificationTasks || [];
+  const ci = state.survey.classificationIdx;
+
+  // Nothing to classify (ended early) or already finished (re-entry
+  // via Back from a later step): let the survey advance normally.
+  if (!selection.length || ci >= selection.length) return 'advance';
+
+  if (ci < 0) {
+    state.survey.classificationIdx = 0;
+    renderSurveyStep();
+    return 'stay';
+  }
+
+  const entry = selection[ci];
+  const chosen = document.querySelector(`input[name="${step.id}__t${entry.task_id}"]:checked`);
+  if (!chosen) { showSurveyError('Please select an answer to continue.'); return 'stay'; }
+
+  const latency = state.survey.classificationShownAt
+    ? Date.now() - state.survey.classificationShownAt : null;
+  const prior = state.survey.classificationAnswers[entry.task_id];
+  state.survey.classificationAnswers[entry.task_id] = {
+    answer: chosen.value,
+    actual_version: entry.version,
+    position: entry.position,
+    sequence_index: ci + 1,
+    latency_ms: latency,
+    // Participants may navigate Back and revise (advisor decision):
+    // track whether this answer replaced an earlier one, and whether
+    // the value actually changed.
+    revised: !!prior,
+    changed_from: prior && prior.answer !== chosen.value ? prior.answer : null,
+  };
+  logEvent('classification_answer_recorded', {
+    task_id: entry.task_id, answer: chosen.value,
+    actual_version: entry.version, sequence_index: ci + 1, latency_ms: latency,
+    revised: !!prior,
+    changed_from: prior && prior.answer !== chosen.value ? prior.answer : null,
+  });
+
+  state.survey.classificationIdx = ci + 1;
+  if (state.survey.classificationIdx < selection.length) {
+    renderSurveyStep();
+    return 'stay';
+  }
+
+  // All tasks answered: record the aggregate response and advance.
+  state.survey.responses[step.id] = { per_task: state.survey.classificationAnswers };
+  logEvent('survey_response', { step_id: step.id, type: step.type });
+  return 'advance';
 }
 
 function showSurveyError(msg) {
@@ -3446,7 +3737,13 @@ function nextSurveyStep() {
   const step = SURVEY_FLOW[idx];
   if (!step) return;
 
-  if (step.type !== 'section' && step.type !== 'info') {
+  if (step.type === 'injection_classification') {
+    // Sequential sub-navigation: Next advances through instructions and
+    // per-task screens, locking each answer as it goes. Only when every
+    // task is answered does Next advance the survey itself.
+    const outcome = handleClassificationNext(step);
+    if (outcome !== 'advance') return;
+  } else if (step.type !== 'section' && step.type !== 'info') {
     const answer = collectSurveyAnswer(step);
     const err = validateSurveyAnswer(step, answer);
     if (err) { showSurveyError(err); return; }
@@ -3469,11 +3766,36 @@ function nextSurveyStep() {
 }
 
 function prevSurveyStep() {
+  const cur = SURVEY_FLOW[state.survey.step];
+
+  // Sub-navigation within the sequential classification: Back steps to
+  // the previous task in the sequence (answers stay editable), and from
+  // the first task back to the instructions screen.
+  if (cur && cur.type === 'injection_classification') {
+    const len = (state.survey.classificationTasks || []).length;
+    if (len && state.survey.classificationIdx > -1) {
+      state.survey.classificationIdx -= 1;
+      renderSurveyStep();
+      return;
+    }
+  }
+
   let prevIdx = state.survey.step - 1;
   while (prevIdx >= 0 && state.survey.skipped.has(SURVEY_FLOW[prevIdx].id)) {
     prevIdx--;
   }
   if (prevIdx < 0) return;
+
+  // Re-entering the classification step from a later step: resume at the
+  // last task so answers can be reviewed and edited.
+  const target = SURVEY_FLOW[prevIdx];
+  if (target.type === 'injection_classification') {
+    const len = (state.survey.classificationTasks || []).length;
+    if (len && state.survey.classificationIdx >= len) {
+      state.survey.classificationIdx = len - 1;
+    }
+  }
+
   state.survey.step = prevIdx;
   renderSurveyStep();
 }
@@ -3500,7 +3822,6 @@ function renderDebrief() {
 // the per-task breakdown, and the participant's own decisions. The full
 // debrief happens AFTER the post-study survey, per §1.7.1.
 function renderParticipantDebrief() {
-  const code = state.serverCompletionCode || completionCode();
   const hasRedirect = !!state.postSurveyRedirectUrl;
 
   // Two modes:
@@ -3527,12 +3848,6 @@ function renderParticipantDebrief() {
         ${escapeHtml(mainMessage)}
       </p>
       ${continueBtn}
-      <div class="text-[11px] text-gray-400 mt-4 mb-2">
-        Completion code (only needed if the survey asks): <span class="font-mono text-gray-500">${escapeHtml(code)}</span>
-      </div>
-      <button onclick="downloadLog()" class="text-[11px] text-gray-400 hover:text-gray-600 underline">
-        Download session log
-      </button>
     </div>`;
 }
 
