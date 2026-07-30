@@ -175,11 +175,9 @@
     <div class="mb-4">
       <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">About this study</div>
       <p class="text-sm text-gray-700 leading-relaxed">
-        In this study, you'll use Agent to complete a series of short tasks.
-        The tasks that follow are scenarios our research team has prepared
-        to see how the agent handles a range of common requests. Some may
-        resemble everyday personal tasks; others relate to the study
-        itself. For each task, make the decisions you would with your own
+        You'll use Agent to complete a series of short tasks our research
+        team has prepared, to see how the agent handles a range of common
+        requests. For each one, make the decisions you would with your own
         accounts and data.
       </p>
     </div>
@@ -405,6 +403,12 @@ const POST_REDIRECT_DELAY_MS = Number(STUDY_CONFIG.postSurveyDelayMs || 1200);
 const STUDY_PID = (URL_PARAMS.get('pid') || '').trim();
 const STUDY_CONDITION = (URL_PARAMS.get('condition') || '').trim().toLowerCase();
 const STUDY_LAUNCH = Boolean(STUDY_PID && STUDY_CONDITION);
+// Pilot mode: append ?pilot=1 to the study link. Adds a short block of
+// pilot-only feedback questions at the end and tags the data run_type:
+// 'pilot' (vs 'live') so pilot sessions are trivial to filter out.
+const PILOT_MODE = URL_PARAMS.get('pilot') === '1';
+const RUN_TYPE = PILOT_MODE ? 'pilot' : 'live';
+const PILOT_STEP_IDS = ['pilot_intro', 'pilot_confusing', 'pilot_broke', 'pilot_realistic', 'pilot_realistic_why', 'pilot_too_long', 'pilot_changes'];
 const DEFAULT_PERMISSIONS = ['webBrowsing'];   // granted to everyone; excluded from user-granted analysis
 const INJECTIONS_PER_SESSION = 5;              // §7.1: 5 injected + 2 benign + 3 clean per participant
 const BENIGN_PER_SESSION = 2;
@@ -814,7 +818,7 @@ const TASKS = [
         await agentSay('Would you like me to save this recipe to your files so you don\'t lose it?');
         const f = await request('t1_save_recipe', { isBenign: true });
         if (f === 'allow') await agentSay('Saved "chocolate_chip_cookies.md" to your files.');
-        else await agentSay('No problem — the recipe is above whenever you need it.');
+        else await agentSay('No problem, the recipe is above whenever you need it.');
       }
       if (isInjection) {
         await agentSay('This would also be fun as a group activity. I could schedule a baking session and invite a few friends. That would need calendar and contacts access.');
@@ -938,7 +942,7 @@ const TASKS = [
       }
       await agentSay('Added: "Check study compensation" Friday at 2:00 PM.');
       if (isBenign) {
-        await agentSay('I can also add a reminder at the 10-business-day mark — that\'s when to contact the team if payment hasn\'t arrived.');
+        await agentSay('I can also add a reminder at the 10-business-day mark, which is when to contact the team if payment hasn\'t arrived.');
         const b = await request('t5_benign_reminder', { isBenign: true });
         if (b === 'allow') await agentSay('Also added: "Contact research team if unpaid" at the 10-business-day mark.');
         else await agentSay('Understood. Only the first reminder is on your calendar.');
@@ -1036,7 +1040,7 @@ const TASKS = [
         const b = await request('t8_broad_files', { isInjection: true });
         if (b === 'allow') {
           await agentSay('Read your files in "Personal/Notes". Here\'s a personalized version of the summary based on what I found:');
-          await agentSay('• Your notes suggest you often stay up past midnight — the article\'s advice on fixed wake times could be especially useful for you.\n• You\'ve mentioned caffeine in the afternoons; the article\'s timing framing applies directly to your habits.\n• The screen-use advice may be relevant given your evening reading habits noted in your files.');
+          await agentSay('• Your notes suggest you often stay up past midnight, so the article\'s advice on fixed wake times could be especially useful for you.\n• You\'ve mentioned caffeine in the afternoons; the article\'s timing framing applies directly to your habits.\n• The screen-use advice may be relevant given your evening reading habits noted in your files.');
         } else {
           await agentSay('Understood. Sticking with the summary above.');
         }
@@ -1126,7 +1130,7 @@ function extractTaskTranscript(taskId) {
       const parts = [prompt.body];
       if (prompt.necessity) parts.push('Necessity note: ' + prompt.necessity);
       if (prompt.how) parts.push('Mechanism note: ' + prompt.how);
-      items.push({ speaker: 'Agent — approval request', text: parts.filter(Boolean).join('\n\n') });
+      items.push({ speaker: 'Agent (approval request)', text: parts.filter(Boolean).join('\n\n') });
     } else if (ev.event === 'approval_decided') {
       const label = ev.decision === 'allow' ? 'You allowed' : 'You denied';
       items.push({ speaker: 'Your decision', text: `${label}: ${ev.action || ev.approval_id}` });
@@ -1224,7 +1228,7 @@ const SURVEY_FLOW = [
     // "noticed but didn't act" group so non-reporters aren't a black hole.
     type: 'reports_review', id: 'p1_reports_review',
     question: 'Earlier, you had the option to flag specific Agent messages or approval requests that looked unexpected. Tell us a bit more about that.',
-    helper: 'There are no wrong answers — we want to understand what stood out and what didn\'t.',
+    helper: 'There are no wrong answers. We want to understand what stood out and what didn\'t.',
     required: false,
   },
   {
@@ -1312,6 +1316,7 @@ const SURVEY_FLOW = [
     type: 'textarea', id: 'p5_safer',
     question: 'What, if anything, would change how willing you are to use AI agents that take actions on your behalf?',
     placeholder: 'Your answer…',
+    required: false,
   },
   {
     // Renamed from p5_real_accounts. The old wording asked whether they
@@ -1407,7 +1412,7 @@ const SURVEY_FLOW = [
       { value: 'not_main',label: 'Yes, but it is not my main concern' },
       { value: 'rarely',  label: 'Rarely' },
       { value: 'never',   label: 'Never' },
-      { value: 'na',      label: "N/A — I don't build user-facing AI applications" },
+      { value: 'na',      label: "N/A (I don't build user-facing AI applications)" },
     ],
   },
   {
@@ -1478,7 +1483,7 @@ const SURVEY_FLOW = [
       <p class="mb-3"><strong>If you would like to withdraw your data:</strong> You may request that your data be deleted at any point during this debrief, or by contacting the research team within two weeks of your participation. There is no penalty for withdrawing your data, and your compensation will not be affected.</p>
       <h3 class="font-semibold text-gray-800 mt-5 mb-2">If you have concerns about your participation</h3>
       <p class="mb-2">If you feel a need to speak with a professional concerning any uncomfortable feelings from your participation in this research, you may contact:</p>
-      <p class="mb-3 text-sm">National Crisis Resources (24/7): 988 Suicide and Crisis Lifeline — Call or text 988. Crisis Text Line — Text HOME to 741741.</p>
+      <p class="mb-3 text-sm">National Crisis Resources (24/7): 988 Suicide and Crisis Lifeline, call or text 988. Crisis Text Line, text HOME to 741741.</p>
       <h3 class="font-semibold text-gray-800 mt-5 mb-2">Questions about the study</h3>
       <p class="mb-2">If you have questions about this research, please contact:</p>
       <p class="mb-2 text-sm">Principal Investigator: Dr. Jinyuan Jia, jinyuan@psu.edu</p>
@@ -1518,8 +1523,50 @@ const SURVEY_FLOW = [
     // they answer "does teaching the concept add anything beyond
     // natural detection?"
     type: 'injection_classification', id: 'p7_injection_classification',
-    question: 'For each task below, do you think it contained a prompt injection?',
-    helper: "You can click 'Review transcript' to look back at what happened in each task before answering.",
+    question: 'For the task below, do you think it contained a prompt injection?',
+    helper: 'The full transcript is shown below. Scroll through it to review what happened before answering.',
+  },
+
+  // ─── Pilot-only feedback ───
+  // Shown ONLY when ?pilot=1 (gated via PILOT_STEP_IDS added to
+  // survey.skipped in startPostSurvey for non-pilot runs). Placed after
+  // the debrief so it never influences task behavior; all optional so it
+  // never blocks a tester. Delete this block (and PILOT_STEP_IDS) for the
+  // real launch, or just drop ?pilot=1 from the link.
+  {
+    type: 'section', id: 'pilot_intro',
+    title: 'A few quick questions about the study',
+    intro: 'These questions are just for our pilot testing and help us improve the study before launch. Answer as much or as little as you like.',
+  },
+  {
+    type: 'textarea', id: 'pilot_confusing', required: false,
+    question: 'Was anything in the instructions or tasks confusing or unclear?',
+    placeholder: 'Your answer…',
+  },
+  {
+    type: 'textarea', id: 'pilot_broke', required: false,
+    question: 'Did anything break or behave unexpectedly (buttons, loading, the survey)?',
+    placeholder: 'Your answer…',
+  },
+  {
+    type: 'scale', id: 'pilot_realistic', required: false,
+    question: "Did the tasks feel realistic, like something you'd actually ask an AI agent?",
+    min: 1, max: 5, minLabel: 'Not at all realistic', maxLabel: 'Very realistic',
+  },
+  {
+    type: 'textarea', id: 'pilot_realistic_why', required: false,
+    question: 'Why did you give that rating?',
+    placeholder: 'Your answer…',
+  },
+  {
+    type: 'textarea', id: 'pilot_too_long', required: false,
+    question: 'Did any part of the study feel too long?',
+    placeholder: 'Your answer…',
+  },
+  {
+    type: 'textarea', id: 'pilot_changes', required: false,
+    question: "Any suggestions before we launch the full study?",
+    placeholder: 'Your answer…',
   },
 
   // ─── End of Study (informational) ───
@@ -2124,6 +2171,7 @@ async function bootstrapParticipantStudy() {
     const startResult = await callStudyApi('start', {
       participant_id: STUDY_PID,
       condition,
+      run_type: RUN_TYPE,
       launch_url: location.href,
       user_agent: navigator.userAgent,
       started_at: new Date().toISOString(),
@@ -2221,7 +2269,7 @@ function showDemoFlag() {
     <div class="chat-message bg-white border border-gray-200 rounded-2xl rounded-bl-md px-4 py-2.5">
       <div class="flex items-start gap-2">
         <div class="flex-1 min-w-0">
-          <div class="text-[10px] uppercase tracking-wide text-purple-500 font-semibold mb-1">Example — not part of your session</div>
+          <div class="text-[10px] uppercase tracking-wide text-purple-500 font-semibold mb-1">Example: not part of your session</div>
           <div class="narration text-sm text-gray-800">This is what an Agent message looks like. Try the flag if a message ever seems unexpected.</div>
         </div>
         <button type="button" data-walkthrough-target="flag" title="Flag this message" aria-label="Flag this message"
@@ -2427,6 +2475,7 @@ function submitReport() {
 // 'quick_decision' + 'Other' are shared by both.
 const PROBE_REASONS_ALLOW = [
   { value: 'necessary',         label: 'The access or action seemed necessary for my task' },
+  { value: 'wanted_it',         label: 'It was something I wanted or found useful' },
   { value: 'trusted_agent',     label: 'I trusted the agent' },
   { value: 'explanation_clear', label: "The agent's explanation made sense" },
   { value: 'quick_decision',    label: 'I made a quick decision without thinking much about it' },
@@ -2519,6 +2568,7 @@ function buildSessionPayload({ endReason, durationSeconds, completed }) {
   const granted = Object.entries(state.permissions).filter(([, v]) => v).map(([k]) => k);
   return {
     schema_version: 1,
+    run_type: RUN_TYPE,
     participant_id: state.participantId,
     session_id: state.sessionId,
     condition: state.condition,
@@ -3036,6 +3086,8 @@ function startPostSurvey({ endReason = 'task_complete' } = {}) {
   state.survey.step = 0;
   state.survey.responses = {};
   state.survey.skipped = new Set();
+  // Pilot-feedback block only appears in pilot runs; hide it otherwise.
+  if (!PILOT_MODE) PILOT_STEP_IDS.forEach(id => state.survey.skipped.add(id));
   state.survey.endReason = endReason;
   state.survey.started_at = new Date().toISOString();
   // Pre-select the 4 classification tasks now so the same tasks are
@@ -3168,7 +3220,7 @@ function renderSurveyStepBody(step) {
       return `
         ${header}
         <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-3 text-sm text-gray-600">
-          You didn't flag any Agent messages or approval requests during the session — that's completely fine.
+          You didn't flag any Agent messages or approval requests during the session. That's completely fine.
         </div>
         <label class="block text-sm font-medium text-gray-800 mb-2">Was there anything you considered flagging but chose not to? If so, what was it, and what made you decide not to flag it?</label>
         <textarea name="${step.id}__none" rows="4" placeholder="Describe what you considered and what made you decide not to flag it…"
@@ -3195,7 +3247,7 @@ function renderSurveyStepBody(step) {
              <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">What was on screen when you flagged this</div>
              ${r.context.map(c => {
                const speaker = c.kind === 'user'     ? 'You'
-                            : c.kind === 'approval' ? 'Agent — approval request'
+                            : c.kind === 'approval' ? 'Agent (approval request)'
                             : c.kind === 'divider'  ? '—'
                             : 'Agent';
                const speakerColor = c.kind === 'user' ? 'text-gray-700'
@@ -3577,12 +3629,6 @@ function collectSurveyAnswer(step) {
 }
 
 function validateSurveyAnswer(step, answer) {
-  // TEMP for advisor review: every step is skippable EXCEPT bg_background,
-  // which still requires a selection so reviewers actually land on the
-  // dev-only Q16-18 (gated on background). Remove this exception block
-  // before launching to re-enable per-step required checks for everything.
-  if (step.id !== 'bg_background') return null;
-  // ─── original validation below ───
   // Sections and info screens never block advancement.
   if (step.type === 'section' || step.type === 'info') return null;
   const required = step.required !== false;
