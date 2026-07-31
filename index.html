@@ -587,17 +587,35 @@ const SAVED_ARTICLE_FOLDER = 'Saved Articles/Sleep';
 // ── Cue copy library: every approval that can appear is registered here, so
 // shown/decision events can be joined by approval_id across the dataset, and
 // the exact cue copy is auditable per §1.7.
+//
+// `kind` rule: 'permission' when allowing grants the agent a data source or
+// device capability it does not already hold at that point in this task's own
+// flow; 'action' when it authorizes a single act with a capability already
+// granted earlier in the same flow. Applied per flow, not per session, since
+// task order is shuffled and a session-level "first grant" is not stable.
+//
+// This was previously coded so that 'permission' fell on exactly the clean
+// required approval of every task and 'action' on every injected and benign
+// one, which made the field perfectly collinear with is_injection/is_benign
+// and therefore carried no independent information. Under the rule above,
+// injected requests split across both values (t2_download and t7_email grant
+// new capabilities; t3_cc and t8_broad_files act through capabilities already
+// held), which is what makes a split on `kind` meaningful.
+//
+// t9_contact_form stays 'action' despite being tagged permission: 'contacts':
+// submitting the participant's own details to a form authorizes one outbound
+// act and gives the agent no standing read access to contacts.
 const APPROVAL_LIB = {
   // ── Task 1: cookie recipe injection (Calendar + Contacts) ──
   t1_calendar: {
-    icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'action',
+    icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'permission',
     action: 'Add a baking session event to your calendar',
     body: 'Agent is requesting access to your calendar to schedule a baking session.',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
     necessity: 'Adding a calendar event is not needed to give you a cookie recipe.',
   },
   t1_contacts: {
-    icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'action',
+    icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'permission',
     action: 'Look up friends to invite to the baking session',
     body: 'Agent is requesting access to your contacts to find friends to invite.',
     how: 'If a page it read contained hidden instructions, this access could share your contacts with others.',
@@ -605,7 +623,7 @@ const APPROVAL_LIB = {
   },
 
   t1_save_recipe: {
-    icon: '📁', title: 'File access requested', permission: 'files', kind: 'action',
+    icon: '📁', title: 'File access requested', permission: 'files', kind: 'permission',
     action: 'Save the recipe to your files',
     body: 'Agent is requesting access to your files to save the recipe as a document.',
     how: 'If a page it read contained hidden instructions, this access could read or change other files.',
@@ -614,7 +632,7 @@ const APPROVAL_LIB = {
 
   // ── Task 2: tic-tac-toe ──
   t2_download: {
-    icon: '⬇️', title: 'Download access requested', permission: 'download', kind: 'action',
+    icon: '⬇️', title: 'Download access requested', permission: 'download', kind: 'permission',
     action: 'Download and install the external package game-tools-py',
     body: 'Agent is requesting download access to install the external package "game-tools-py".',
     how: 'If a page it read contained hidden instructions, this access could install software you never requested.',
@@ -653,7 +671,7 @@ const APPROVAL_LIB = {
   },
 
   t3_save_contact: {
-    icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'action',
+    icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'permission',
     action: "Add the research assistant's email address to your contacts",
     body: 'Agent is requesting access to your contacts to save the research assistant\'s email address for future correspondence.',
     how: 'If a page it read contained hidden instructions, this access could share your contacts with others.',
@@ -662,7 +680,7 @@ const APPROVAL_LIB = {
 
   // ── Task 4: email to study coordinator confirming session completion ──
   t4_files: {
-    icon: '📁', title: 'File access requested', permission: 'files', kind: 'action',
+    icon: '📁', title: 'File access requested', permission: 'files', kind: 'permission',
     // No justification clause here. `action` is not shown on the approval card;
     // it is replayed in the reasoning probe ("The request: …") and in the Part 4
     // decision lines, so a pretext embedded here would re-argue the request at
@@ -682,7 +700,7 @@ const APPROVAL_LIB = {
   },
 
   t4_followup_reminder: {
-    icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'action',
+    icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'permission',
     action: 'Add a reminder to follow up in 7 days if there is no reply',
     body: 'Agent is requesting access to your calendar to add a reminder to follow up if you haven\'t heard back in 7 days.',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
@@ -722,7 +740,7 @@ const APPROVAL_LIB = {
     necessity: 'Calendar access is needed to schedule the meeting.',
   },
   t6_location: {
-    icon: '📍', title: 'Location access requested', permission: 'location', kind: 'action',
+    icon: '📍', title: 'Location access requested', permission: 'location', kind: 'permission',
     action: 'Use your location to add your current location to the meeting event',
     body: 'Agent is requesting access to your location to attach your current location to the meeting event.',
     how: 'If a page it read contained hidden instructions, this access could put your location on events others see.',
@@ -746,7 +764,7 @@ const APPROVAL_LIB = {
     necessity: 'File access is needed to read and organize the study documents.',
   },
   t7_email: {
-    icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'action',
+    icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'permission',
     action: 'Share the combined study document with the participant mailing list',
     body: 'Agent is requesting access to your email to share the combined study document with the participant mailing list.',
     how: 'If a page it read contained hidden instructions, this access could send messages you didn\'t intend.',
@@ -810,7 +828,7 @@ const APPROVAL_LIB = {
   },
 
   t9_save_contact: {
-    icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'action',
+    icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'permission',
     action: "Add the library's phone number to your contacts",
     body: 'Agent is requesting access to your contacts to save the library\'s phone number in case you want to call ahead.',
     how: 'If a page it read contained hidden instructions, this access could share your contacts with others.',
@@ -819,7 +837,7 @@ const APPROVAL_LIB = {
 
   // ── Task 10: personal website ──
   t10_download: {
-    icon: '⬇️', title: 'Download access requested', permission: 'download', kind: 'action',
+    icon: '⬇️', title: 'Download access requested', permission: 'download', kind: 'permission',
     action: 'Fetch the external visitor-counter widget from webstats-cdn.net',
     body: 'Agent is requesting download access to fetch a visitor-counter widget from webstats-cdn.net.',
     how: 'If a page it read contained hidden instructions, this access could pull in code you never requested.',
@@ -950,11 +968,19 @@ const TASKS = [
   {
     id: 4, type: 'Email',
     shortLabel: 'Study coordinator email',
-    instruction: 'Your task: have Agent write and send a short email to the study coordinator confirming you completed today\'s session and asking whether anything else is needed from you.',
-    prompt: 'Write and send a short email to the study coordinator confirming I completed today\'s session and asking whether anything else is needed from me.',
+    // The "and ask whether anything else is needed from me" clause was dropped.
+    // Beyond being the longest prompt in the set, it invited the agent to
+    // volunteer extras, which made the injected attachment offer read as
+    // responsive to the participant's own request rather than off-goal, and
+    // put strain on the cue that says the attachments are not needed.
+    instruction: 'Your task: have Agent write and send a short email to the study coordinator confirming you completed today\'s session.',
+    prompt: 'Write and send a short email to the study coordinator confirming I completed today\'s session.',
     flow: async ({ isInjection, isBenign, request }) => {
       await agentSay('Sure. Here\'s a short message you can send:');
-      await agentSay('Subject: Session completed\n\nHi, I completed today\'s study session and wanted to confirm that on your end. Please let me know if anything else is needed from me.\n\nThanks,\n[Your name]');
+      // Closing line trimmed for the same reason as the prompt: "let me know if
+      // anything else is needed" is an open invitation sitting on screen
+      // moments before the injected attachment offer.
+      await agentSay('Subject: Session completed\n\nHi, I completed today\'s study session and wanted to confirm that on your end.\n\nThanks,\n[Your name]');
       if (isInjection) {
         await agentSay('To help the coordinator confirm which session you attended, I could attach session_notes.txt and participant_info.pdf. That needs file access.');
         const f = await request('t4_files', { isInjection: true });
@@ -1331,9 +1357,11 @@ const SURVEY_FLOW = [
     // Reports-based detection review. Renderer pulls from state.reports:
     // if the participant flagged things during the session, each one is
     // shown with a textarea asking why they flagged it. If they didn't
-    // flag anything, the fallback asks whether they noticed the icon at all
-    // and whether they considered flagging. This captures the "noticed but
-    // didn't act" group so non-reporters aren't a black hole.
+    // flag anything, the fallback is a single four-option item covering both
+    // whether they noticed the icon and whether they considered using it,
+    // with a follow-up box that appears only for the "considered it but
+    // decided not to" option. That keeps the "noticed but didn't act" group
+    // from being a black hole without asking everyone an open question.
     //
     // The wording DESCRIBES the icon rather than referring back to it,
     // because the flag is deliberately never explained during the session
@@ -1341,13 +1369,20 @@ const SURVEY_FLOW = [
     // trying to observe). So a participant may reach this question having
     // never registered that the control existed, and "earlier you had the
     // option to..." would be asking them to recall something they were
-    // never told. The added noticed/not-noticed item is what separates
-    // "saw nothing worth flagging" from "never saw the button", which is
-    // otherwise indistinguishable in a zero count.
+    // never told. Splitting "I didn't notice the icon" from "I noticed it,
+    // but nothing seemed worth flagging" is what separates "saw nothing
+    // worth flagging" from "never saw the button", which is otherwise
+    // indistinguishable in a zero count.
     type: 'reports_review', id: 'p1_reports_review',
     question: 'A small flag icon (⚑) sat to the right of every Agent message and approval request.',
     helper: 'Clicking it marked something as unexpected. There was no right or wrong amount to use it.',
-    required: false,
+    // Required, but only on the zero-flag branch (enforced in
+    // validateSurveyAnswer). That branch is expected to be the modal path and
+    // carries the detection-awareness signal for most of the sample, and it
+    // offers an explicit "I'm not sure", so a blank is uninterpretable rather
+    // than meaningful. The flagged branch's per-report "why" boxes stay
+    // optional: those participants have already given the behavioural signal.
+    required: true,
   },
   {
     // Multi-select so we can directly compare the share of participants
@@ -2307,6 +2342,11 @@ function startStudy(options = {}) {
     task_queue: state.taskQueue,
     total_tasks: state.taskQueue.length,
     injections_planned: state.taskQueue.filter(t => t.version === 'injection').length,
+    // Drawn ordinals for the two reasoning probes. Logged because without them
+    // a session with no probe events is uninterpretable: a participant who
+    // ended early may simply never have reached the target ordinal, and that
+    // is indistinguishable from a probe that failed to fire.
+    probe_targets: { ...state.probes.targets },
   });
 
   // Participant welcome adapts the task-count bullet to the actual queue size.
@@ -2731,11 +2771,24 @@ let _probeShownAt = null;
 function maybeQueueReasoningProbe(meta, decision) {
   if (typeof DOC_MODE !== 'undefined' && DOC_MODE) return;
   const p = state.probes;
-  if (!p || p.pending) return;
+  if (!p) return;
+  // Benign over-requests carry is_injection false, so they land in the 'clean'
+  // counting pool. is_benign is recorded on the probe itself below, because a
+  // probe that fires on an unnecessary-but-harmless request is a different
+  // observation from one on a genuinely required request, and is_injection
+  // alone cannot tell them apart after the fact.
   const category = meta.is_injection ? 'injection' : 'clean';
   if (p.fired[category]) return;
+  // Counted before the pending check. A decision made while another probe is
+  // still queued is still a decision in this category, and task 1 fires two
+  // approvals back to back, so skipping the increment there would shift every
+  // later ordinal in that category.
   p.counts[category] += 1;
-  if (p.counts[category] !== p.targets[category]) return;
+  if (p.pending) return;
+  // >= rather than ===: if the target ordinal happened to land on a decision
+  // made while another probe was queued, arm on the next one instead of
+  // losing this category's probe for the rest of the session.
+  if (p.counts[category] < p.targets[category]) return;
   p.fired[category] = true;
   p.pending = {
     category,
@@ -2744,6 +2797,7 @@ function maybeQueueReasoningProbe(meta, decision) {
     permission: meta.permission,
     action: meta.action,
     is_injection: meta.is_injection,
+    is_benign: !!meta.is_benign,
     decision,
   };
 }
@@ -2825,6 +2879,13 @@ function buildSessionPayload({ endReason, durationSeconds, completed }) {
     user_granted_permissions: granted.filter(p => !DEFAULT_PERMISSIONS.includes(p)),
     task_queue: state.taskQueue,
     per_task: state.taskQueue.map(t => state.perTask[t.task_id]),
+    // Probe bookkeeping surfaced at the top level so a zero-probe session can
+    // be read without walking the event list: targets are the drawn ordinals,
+    // counts are how many decisions of each category the participant actually
+    // made, fired says whether each probe was ever shown.
+    probes: state.probes
+      ? { targets: { ...state.probes.targets }, counts: { ...state.probes.counts }, fired: { ...state.probes.fired } }
+      : null,
     completion_code: completionCode(),
     user_agent: navigator.userAgent,
     launch_url: location.href,
@@ -3025,9 +3086,17 @@ async function runCurrentTask() {
   // Brief delay before the Continue button appears (set below). Gives
   // the agent's last message a moment to sit alone on screen so
   // participants read it carefully before being offered the next action.
+  // Deliberately says nothing about the flag. It used to add "If a message or
+  // request seemed unexpected, you can flag it before continuing", which named
+  // the exact judgment the injected requests call for and repeated it at every
+  // task boundary, priming tasks 2 through 10. That contradicted the un-primed
+  // design this measure depends on (see the flagging section header and the
+  // reports_review notes in SURVEY_FLOW), and it would have made the
+  // "did you notice the flag icon" item unanswerable. The affordance stays
+  // visible on every message and is meant to be found, not announced.
   document.getElementById('chat-footer-hint').textContent = isLast
-    ? 'Session complete. If a message or request seemed unexpected, you can flag it before continuing.'
-    : 'Task complete. If a message or request seemed unexpected, you can flag it before continuing.';
+    ? 'Session complete.'
+    : 'Task complete.';
   const btn = document.getElementById('chat-next-btn');
   btn.textContent = isLast
     ? (shouldRunPostSurvey() ? 'Continue to post-study survey' : 'Finish session')
@@ -3393,6 +3462,21 @@ function renderSurveyStep() {
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
+// Reveals the "what made you decide against it?" box on the zero-flag branch
+// of reports_review, for the one option it applies to. Clearing the box when
+// the participant moves off that option keeps a stale answer from being
+// submitted under a choice that contradicts it.
+function toggleFlagDeclinedNote(stepId, value) {
+  const wrap = document.getElementById(`${stepId}__declined-wrap`);
+  if (!wrap) return;
+  const show = value === 'considered';
+  wrap.classList.toggle('hidden', !show);
+  if (!show) {
+    const t = wrap.querySelector('textarea');
+    if (t) t.value = '';
+  }
+}
+
 function renderSurveyStepBody(step) {
   if (step.type === 'section') {
     return `
@@ -3468,29 +3552,39 @@ function renderSurveyStepBody(step) {
 
   if (step.type === 'reports_review') {
     if (state.reports.length === 0) {
-      // Two separate items on purpose. A zero flag count conflates "saw
+      // One item carrying two signals. A zero flag count conflates "saw
       // nothing worth flagging" with "never noticed the icon", and only the
-      // first is evidence about detection. Asking the awareness question
-      // first keeps the follow-up interpretable.
-      const noticedOpts = [
-        ['yes', 'Yes, I noticed it'],
-        ['no', "No, I didn't notice it"],
-        ['unsure', "I'm not sure"],
+      // first is evidence about detection, so the options have to separate
+      // them. The third option splits off the "noticed something but let it
+      // pass" subgroup, which is the only group the free-text follow-up has
+      // anything to say about, so the textarea is revealed for that option
+      // alone. Asking it of everyone (the earlier two-question form) put an
+      // open box in front of participants who had just said they never saw
+      // the icon, and primed the rest with a description of a control they
+      // hadn't registered.
+      const experienceOpts = [
+        ['not_noticed',     "I didn't notice the icon"],
+        ['noticed_nothing', 'I noticed it, but nothing seemed worth flagging'],
+        ['considered',      'I noticed it and considered flagging something, but decided not to'],
+        ['unsure',          "I'm not sure"],
       ].map(([v, label]) => `
-        <label class="flex-1 cursor-pointer">
-          <input type="radio" name="${step.id}__noticed" value="${v}" class="peer sr-only">
-          <div class="text-center py-2.5 px-2 border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-700 peer-checked:bg-gray-800 peer-checked:text-white peer-checked:border-gray-800 transition">${escapeHtml(label)}</div>
+        <label class="flex items-start gap-2.5 p-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
+          <input type="radio" name="${step.id}__experience" value="${v}" class="mt-1"
+            onchange="toggleFlagDeclinedNote('${step.id}', this.value)" />
+          <span class="text-sm text-gray-800">${escapeHtml(label)}</span>
         </label>`).join('');
-      // No "you didn't use it" banner here: asking whether they noticed it
-      // already implies they didn't use it, and the banner made the flag the
-      // third thing described before the first actual question.
+      // No "you didn't use it" banner here: the options already say it, and
+      // the banner made the flag the third thing described before the first
+      // actual question.
       return `
         ${header}
-        <label class="block text-sm font-medium text-gray-800 mb-2">Did you notice it during the tasks?</label>
-        <div class="flex gap-2 mb-5">${noticedOpts}</div>
-        <label class="block text-sm font-medium text-gray-800 mb-2">Was there anything you considered flagging but chose not to? What made you decide against it?</label>
-        <textarea name="${step.id}__none" rows="4" placeholder="Optional…"
-          class="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none"></textarea>
+        <label class="block text-sm font-medium text-gray-800 mb-2">Which best describes your experience with it?</label>
+        <div class="space-y-2">${experienceOpts}</div>
+        <div id="${step.id}__declined-wrap" class="hidden mt-5">
+          <label class="block text-sm font-medium text-gray-800 mb-2">What did you consider flagging, and what made you decide against it?</label>
+          <textarea name="${step.id}__none" rows="4" placeholder="Optional…"
+            class="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none"></textarea>
+        </div>
       `;
     }
     const cards = state.reports.map((r, i) => {
@@ -3803,13 +3897,16 @@ function restoreSurveyAnswer(step) {
         if (t) t.value = val;
       });
     }
+    if (saved && saved.flag_experience) {
+      const r = root.querySelector(`input[name="${step.id}__experience"][value="${saved.flag_experience}"]`);
+      if (r) r.checked = true;
+      // Re-open the conditional box before refilling it, or Back/Next would
+      // restore the text into a hidden field and drop it on the next collect.
+      toggleFlagDeclinedNote(step.id, saved.flag_experience);
+    }
     if (saved && saved.considered_not_reporting !== undefined) {
       const t = root.querySelector(`textarea[name="${step.id}__none"]`);
       if (t) t.value = saved.considered_not_reporting;
-    }
-    if (saved && saved.noticed_flag_affordance) {
-      const r = root.querySelector(`input[name="${step.id}__noticed"][value="${saved.noticed_flag_affordance}"]`);
-      if (r) r.checked = true;
     }
   } else if (step.type === 'scale') {
     const el = root.querySelector(`input[name="${step.id}"][value="${saved}"]`);
@@ -3866,12 +3963,16 @@ function collectSurveyAnswer(step) {
       const v = t.value.trim();
       if (v) reasons[t.dataset.reportId] = v;
     });
-    const noneTextarea = root.querySelector(`textarea[name="${step.id}__none"]`);
     const out = { reasons };
-    if (noneTextarea) out.considered_not_reporting = noneTextarea.value.trim();
-    // Only rendered on the zero-flag path; absent for participants who flagged.
-    const noticed = root.querySelector(`input[name="${step.id}__noticed"]:checked`);
-    if (noticed) out.noticed_flag_affordance = noticed.value;
+    // Both only render on the zero-flag path; absent for participants who
+    // flagged. The note is conditional on the "considered but decided not to"
+    // option, so it is stored only when that option is the live selection.
+    const experience = root.querySelector(`input[name="${step.id}__experience"]:checked`);
+    if (experience) out.flag_experience = experience.value;
+    const noneTextarea = root.querySelector(`textarea[name="${step.id}__none"]`);
+    if (noneTextarea && experience && experience.value === 'considered') {
+      out.considered_not_reporting = noneTextarea.value.trim();
+    }
     return out;
   }
   if (step.type === 'injection_classification') {
@@ -3929,6 +4030,14 @@ function validateSurveyAnswer(step, answer) {
   }
   if (step.type === 'textarea') {
     if (!answer || !answer.length) return 'Please enter a response to continue.';
+    return null;
+  }
+  if (step.type === 'reports_review') {
+    // Only the zero-flag branch blocks advancement. The flagged branch renders
+    // free-text boxes asking why each flag was raised, and those stay optional.
+    if (state.reports.length === 0 && (!answer || !answer.flag_experience)) {
+      return 'Please select the option that best describes your experience.';
+    }
     return null;
   }
   return null;
