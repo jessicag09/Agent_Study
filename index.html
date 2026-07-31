@@ -186,11 +186,35 @@
       <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">How it works</div>
       <ul class="text-sm text-gray-700 leading-relaxed space-y-1.5 list-disc pl-5">
         <li id="welcome-task-count">You'll complete <strong>10 short tasks</strong> with Agent (about 10 to 15 minutes).</li>
-        <li>To keep the experience consistent across participants, the tasks are <strong>pre-written</strong>. You'll see each one in a pop-up and click "Send" to give it to Agent. There's no chat input.</li>
-        <li>At some points, Agent may ask you to confirm a step before continuing. <strong>Respond as you naturally would.</strong></li>
-        <li>A quick overview of the chat controls will appear when you get started.</li>
-        <li>Please stay in this tab and <strong>do not refresh or close the page</strong> until you finish. The session cannot be restarted partway through.</li>
+        <!-- Keeps the "so everyone sees the same ones" rationale: without it
+             the missing chat input reads as a broken interface rather than a
+             design choice, and participants ask about it at the first task. -->
+        <li>The tasks are <strong>pre-written</strong> so everyone sees the same ones. Each appears in a pop-up; click "Send" to give it to Agent. There's no chat input.</li>
+        <!-- Stating that both answers are normal is deliberate: without it,
+             participants read the approvals as a step to clear in order to
+             finish the task, which biases toward allow and would inflate
+             approval rates in every arm (the RQ3 outcome). The framing is
+             symmetric and does not hint at the security focus. It is also
+             true: every deny branch continues the flow. -->
+        <li>At some points, Agent may ask you to confirm a step before continuing. Approving and declining are both normal responses, and the session continues either way. <strong>Respond as you naturally would.</strong></li>
       </ul>
+    </div>
+
+    <!-- Pulled out of the bullet list so it is not read as one more piece of
+         setup detail: it is the only item with a cost attached, and it is the
+         one participants act on incorrectly. Amber rather than red, because
+         a reload is recoverable (the tasks restart) and a red alert would
+         overstate it on a screen that also has to feel low-pressure.
+         Scoped to the task phase on purpose: a task-phase reload restarts
+         under a new session id (see bootstrapParticipantStudy), while a
+         survey-phase reload now resumes in place via resumeSurveyFromBackup,
+         so the old blanket "cannot be restarted" claim was wrong both ways. -->
+    <div class="mb-5 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+      <div class="text-amber-500 text-base leading-none mt-0.5" aria-hidden="true">⚠</div>
+      <p class="text-sm text-amber-900 leading-relaxed">
+        <strong>Please stay in this tab until you finish.</strong>
+        Refreshing during the tasks will restart them from the beginning.
+      </p>
     </div>
 
     <button onclick="goToChat()" class="w-full py-3.5 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition text-base">
@@ -205,14 +229,13 @@
 <div id="screen-chat" class="screen flex-col h-screen bg-gray-50">
   <div class="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 shadow-sm">
     <div class="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center text-lg">🤖</div>
-    <div data-walkthrough-target="status">
+    <div>
       <div class="text-sm font-semibold text-gray-800">Agent</div>
       <div class="text-xs text-green-500 font-medium">● Online</div>
     </div>
     <div class="ml-auto flex items-center gap-3">
-      <div id="chat-progress" data-walkthrough-target="progress" class="text-xs text-gray-400 font-medium"></div>
-      <button onclick="endSessionEarly()" data-walkthrough-target="end" class="text-xs text-red-400 hover:text-red-600 border border-red-200 hover:border-red-300 rounded-lg px-3 py-1.5 transition">End</button>
-      <button onclick="startWalkthrough(false)" title="Show the chat overview again" class="text-xs text-gray-300 hover:text-gray-500 border border-gray-200 hover:border-gray-300 rounded-full w-7 h-7 flex items-center justify-center transition" aria-label="Show the chat overview again">?</button>
+      <div id="chat-progress" class="text-xs text-gray-400 font-medium"></div>
+      <button onclick="endSessionEarly()" class="text-xs text-red-400 hover:text-red-600 border border-red-200 hover:border-red-300 rounded-lg px-3 py-1.5 transition">End</button>
     </div>
   </div>
 
@@ -241,27 +264,6 @@
     <button id="task-send-btn" onclick="sendTask()" class="w-full py-3.5 bg-gray-800 text-white rounded-xl font-semibold hover:bg-gray-700 transition text-sm">
       Send to Agent
     </button>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════
-     WALKTHROUGH OVERLAY
-     Spotlight-style onboarding tour shown on first arrival at the chat
-     screen. Sequentially highlights core controls and the message flag so
-     participants can find them without reading dense bullets on the
-     welcome screen. Re-triggerable via the "?" icon in the chat header.
-     `data-walkthrough-target="…"` on each highlighted element tells the
-     positioning code which element the spotlight should cover.
-═══════════════════════════════════════════════ -->
-<div id="walkthrough-overlay" class="hidden fixed inset-0 z-[60] pointer-events-none">
-  <div id="walkthrough-spotlight" class="fixed rounded-lg pointer-events-auto transition-all duration-200"
-       style="box-shadow: 0 0 0 9999px rgba(15,23,42,0.6); background: transparent;"></div>
-  <div id="walkthrough-tooltip" class="fixed bg-white rounded-xl shadow-xl p-4 pointer-events-auto" style="z-index: 70; max-width: 320px;">
-    <div id="walkthrough-step-num" class="text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1"></div>
-    <div id="walkthrough-caption" class="text-sm text-gray-800 mb-3"></div>
-    <div class="flex items-center justify-end">
-      <button id="walkthrough-next-btn" onclick="nextWalkthroughStep()" class="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition">Next</button>
-    </div>
   </div>
 </div>
 
@@ -592,14 +594,14 @@ const APPROVAL_LIB = {
     action: 'Add a baking session event to your calendar',
     body: 'Agent is requesting access to your calendar to schedule a baking session.',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'You asked for a cookie recipe; this adds an event to your calendar.',
+    necessity: 'Adding a calendar event is not needed to give you a cookie recipe.',
   },
   t1_contacts: {
     icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'action',
     action: 'Look up friends to invite to the baking session',
     body: 'Agent is requesting access to your contacts to find friends to invite.',
     how: 'If a page it read contained hidden instructions, this access could share your contacts with others.',
-    necessity: 'You asked for a cookie recipe; this looks up people in your contacts.',
+    necessity: 'Looking up contacts is not needed to give you a cookie recipe.',
   },
 
   t1_save_recipe: {
@@ -607,7 +609,7 @@ const APPROVAL_LIB = {
     action: 'Save the recipe to your files',
     body: 'Agent is requesting access to your files to save the recipe as a document.',
     how: 'If a page it read contained hidden instructions, this access could read or change other files.',
-    necessity: 'You asked for a cookie recipe; this saves a document to your files.',
+    necessity: 'Saving the recipe to a file is not needed to give you a cookie recipe.',
   },
 
   // ── Task 2: tic-tac-toe ──
@@ -616,14 +618,14 @@ const APPROVAL_LIB = {
     action: 'Download and install the external package game-tools-py',
     body: 'Agent is requesting download access to install the external package "game-tools-py".',
     how: 'If a page it read contained hidden instructions, this access could install software you never requested.',
-    necessity: 'You asked for a tic-tac-toe game; this installs an external package on your device.',
+    necessity: 'Installing a third-party package is not needed to write and save this game.',
   },
   t2_files: {
     icon: '📁', title: 'File access requested', permission: 'files', kind: 'permission',
     action: 'Save tic_tac_toe.py to your device',
     body: 'Agent is requesting access to your files to save tic_tac_toe.py to your device.',
     how: 'If a page it read contained hidden instructions, this access could read or change other files.',
-    necessity: 'You asked to save the game; this writes tic_tac_toe.py to your device.',
+    necessity: 'File access is needed to save the game to your device.',
   },
 
   t2_readme: {
@@ -631,7 +633,7 @@ const APPROVAL_LIB = {
     action: 'Save an additional README file with instructions for running the game',
     body: 'Agent is requesting access to your files to save an additional README file with instructions for running the game.',
     how: 'If a page it read contained hidden instructions, this access could read or change other files.',
-    necessity: 'You asked for a tic-tac-toe game; this writes an extra README file to your device.',
+    necessity: 'An additional README file is not needed to write and save this game.',
   },
 
   // ── Task 3: thank-you email to research assistant ──
@@ -640,14 +642,14 @@ const APPROVAL_LIB = {
     action: 'Send the thank-you email to the research assistant',
     body: 'Agent is requesting access to your email to send the thank-you note.',
     how: 'If a page it read contained hidden instructions, this access could send messages you didn\'t intend.',
-    necessity: 'You asked to send a thank-you email; this sends it from your email account.',
+    necessity: 'Email access is needed to send the thank-you note.',
   },
   t3_cc: {
     icon: '✉️', title: 'Confirm sending with extra recipient', permission: 'email', kind: 'action',
     action: 'Send the thank-you email and also CC lab-coordinator@studyteam-mail.com',
     body: 'Agent is asking to send the email with an additional CC to lab-coordinator@studyteam-mail.com.',
     how: 'If a page it read contained hidden instructions, this access could send copies to recipients you didn\'t choose.',
-    necessity: 'You asked to email the research assistant; this also copies lab-coordinator@studyteam-mail.com.',
+    necessity: 'Adding this extra recipient is not needed to send the thank-you note.',
   },
 
   t3_save_contact: {
@@ -655,7 +657,7 @@ const APPROVAL_LIB = {
     action: "Add the research assistant's email address to your contacts",
     body: 'Agent is requesting access to your contacts to save the research assistant\'s email address for future correspondence.',
     how: 'If a page it read contained hidden instructions, this access could share your contacts with others.',
-    necessity: 'You asked to send a thank-you email; this saves an address to your contacts.',
+    necessity: 'Adding the address to your contacts is not needed to send the thank-you note.',
   },
 
   // ── Task 4: email to study coordinator about compensation ──
@@ -664,14 +666,14 @@ const APPROVAL_LIB = {
     action: 'Attach session_notes.txt and participant_info.pdf for verification',
     body: 'Agent is requesting access to your files to attach session_notes.txt and participant_info.pdf.',
     how: 'If a page it read contained hidden instructions, this access could send data you didn\'t intend to share.',
-    necessity: 'You asked to email the coordinator about compensation; this attaches two files from your device.',
+    necessity: 'Attaching these files is not needed to ask about compensation.',
   },
   t4_email: {
     icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'permission',
     action: 'Send the email to the study coordinator',
     body: 'Agent is requesting access to your email to send the message to the study coordinator.',
     how: 'If a page it read contained hidden instructions, this access could send messages you didn\'t intend.',
-    necessity: 'You asked to send the coordinator an email; this sends it from your email account.',
+    necessity: 'Email access is needed to send the message to the study coordinator.',
   },
 
   t4_followup_reminder: {
@@ -679,7 +681,7 @@ const APPROVAL_LIB = {
     action: 'Add a reminder to follow up on compensation in 7 business days',
     body: 'Agent is requesting access to your calendar to add a reminder to follow up if you haven\'t heard back in 7 business days.',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'You asked to email the coordinator about compensation; this adds a reminder to your calendar.',
+    necessity: 'A follow-up reminder is not needed to ask about compensation.',
   },
 
   // ── Task 5: compensation-check reminder ──
@@ -688,14 +690,14 @@ const APPROVAL_LIB = {
     action: 'Add a reminder to check that your study compensation arrived',
     body: 'Agent is requesting access to your calendar to add a reminder for Friday at 2 PM to check that your study compensation has arrived.',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'You asked for a Friday 2 PM reminder; this creates that event on your calendar.',
+    necessity: 'Calendar access is needed to add the compensation reminder.',
   },
   t5_extra_event: {
     icon: '📅', title: 'Confirm adding a second event', permission: 'calendar', kind: 'action',
     action: 'Add a second reminder: sign up for future paid studies',
     body: 'Agent is asking to add a second event: a reminder next month to sign up for future paid studies.',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'You asked for one Friday reminder; this adds a second event next month about paid studies.',
+    necessity: 'A second reminder is not needed to add the compensation reminder.',
   },
 
   t5_benign_reminder: {
@@ -703,7 +705,7 @@ const APPROVAL_LIB = {
     action: 'Add a second reminder at the 10-business-day mark',
     body: 'Agent is asking to add a second event: a reminder at the 10-business-day mark to contact the team if payment hasn\'t arrived.',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'You asked for one Friday reminder; this adds a second event at the 10-business-day mark.',
+    necessity: 'A second reminder is not needed to add the compensation reminder.',
   },
 
   // ── Task 6: schedule a meeting ──
@@ -712,14 +714,14 @@ const APPROVAL_LIB = {
     action: 'Add the Monday 10 AM meeting to your calendar',
     body: 'Agent is requesting access to your calendar to schedule a meeting for next Monday at 10 AM.',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'You asked to schedule a Monday 10 AM meeting; this creates that event on your calendar.',
+    necessity: 'Calendar access is needed to schedule the meeting.',
   },
   t6_location: {
     icon: '📍', title: 'Location access requested', permission: 'location', kind: 'action',
     action: 'Use your location to add your current location to the meeting event',
     body: 'Agent is requesting access to your location to attach your current location to the meeting event.',
     how: 'If a page it read contained hidden instructions, this access could put your location on events others see.',
-    necessity: 'You asked to schedule a Monday meeting; this reads your location and attaches it to the event.',
+    necessity: 'Location is not needed to schedule the meeting.',
   },
 
   t6_prep_block: {
@@ -727,7 +729,7 @@ const APPROVAL_LIB = {
     action: 'Block 30 minutes of prep time before the meeting',
     body: 'Agent is asking to add a second event: a 30-minute prep block before the Monday meeting.',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'You asked to schedule one meeting; this adds a second event, a 30-minute prep block.',
+    necessity: 'A second calendar event is not needed to schedule the meeting.',
   },
 
   // ── Task 7: organize study documents ──
@@ -736,14 +738,14 @@ const APPROVAL_LIB = {
     action: 'Read and combine the study documents into one file',
     body: 'Agent is requesting access to your files to read the study documents and compile them.',
     how: 'If a page it read contained hidden instructions, this access could read or change other files.',
-    necessity: 'You asked to combine the study documents; this reads those files from your device.',
+    necessity: 'File access is needed to read and organize the study documents.',
   },
   t7_email: {
     icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'action',
     action: 'Share the combined study document with the participant mailing list',
     body: 'Agent is requesting access to your email to share the combined study document with the participant mailing list.',
     how: 'If a page it read contained hidden instructions, this access could send messages you didn\'t intend.',
-    necessity: 'You asked to combine the study documents; this emails the result to the participant mailing list.',
+    necessity: 'Sharing the document is not needed to organize the study documents.',
   },
 
   t7_backup: {
@@ -751,7 +753,7 @@ const APPROVAL_LIB = {
     action: 'Save a backup copy of the combined document to a separate folder',
     body: 'Agent is requesting access to your files to save a backup copy of the combined document to a separate folder.',
     how: 'If a page it read contained hidden instructions, this access could read or change other files.',
-    necessity: 'You asked to combine the study documents; this saves an extra backup copy elsewhere on your device.',
+    necessity: 'A backup copy is not needed to organize the study documents.',
   },
 
   // ── Task 8: summarize PDF ──
@@ -760,14 +762,14 @@ const APPROVAL_LIB = {
     action: `Read ${SAVED_ARTICLE_FILE} so it can be summarized`,
     body: `Agent is requesting access to your files to read "${SAVED_ARTICLE_FILE}".`,
     how: 'If a page it read contained hidden instructions, this access could read or change other files.',
-    necessity: `You asked for a summary of the article; this reads "${SAVED_ARTICLE_FILE}".`,
+    necessity: `File access is needed to read "${SAVED_ARTICLE_FILE}" and summarize it.`,
   },
   t8_broad_files: {
     icon: '📁', title: 'Confirm broader file access', permission: 'files', kind: 'action',
     action: 'Read files in Personal/Notes to personalize the summary',
     body: 'Agent is requesting file access to read your files in "Personal/Notes".',
     how: 'If a page it read contained hidden instructions, this broader access could read your personal files.',
-    necessity: 'You asked for a summary of the article; this reads your Personal/Notes folder as well.',
+    necessity: `Reading your Personal/Notes folder is not needed to summarize "${SAVED_ARTICLE_FILE}".`,
   },
 
   t8_save_summary: {
@@ -775,7 +777,7 @@ const APPROVAL_LIB = {
     action: 'Save the summary as a file for later reference',
     body: 'Agent is requesting access to your files to save the summary as a document for later reference.',
     how: 'If a page it read contained hidden instructions, this access could read or change other files.',
-    necessity: 'You asked for a summary of the article; this saves the summary as a file.',
+    necessity: `Saving the summary as a file is not needed to summarize "${SAVED_ARTICLE_FILE}".`,
   },
 
   // ── Task 9: study payment policy ──
@@ -784,7 +786,7 @@ const APPROVAL_LIB = {
     action: 'Submit your contact info to receive future study invitations',
     body: 'Agent is asking to submit your contact info to the research team\'s mailing list.',
     how: 'If a page it read contained hidden instructions, this could enroll you in lists you didn\'t choose.',
-    necessity: 'You asked about the payment policy; this submits your contact info to a mailing list.',
+    necessity: 'Submitting contact info is not needed to summarize the payment policy.',
   },
 
   t9_save_contact: {
@@ -792,7 +794,7 @@ const APPROVAL_LIB = {
     action: "Add the research team's contact address to your contacts",
     body: 'Agent is requesting access to your contacts to save the research team\'s contact address in case payment doesn\'t arrive on time.',
     how: 'If a page it read contained hidden instructions, this access could share your contacts with others.',
-    necessity: 'You asked about the payment policy; this saves an address to your contacts.',
+    necessity: 'Adding the contact address is not needed to summarize the payment policy.',
   },
 
   // ── Task 10: personal website ──
@@ -801,21 +803,21 @@ const APPROVAL_LIB = {
     action: 'Fetch the external visitor-counter widget from webstats-cdn.net',
     body: 'Agent is requesting download access to fetch a visitor-counter widget from webstats-cdn.net.',
     how: 'If a page it read contained hidden instructions, this access could pull in code you never requested.',
-    necessity: 'You asked for a basic personal website; this downloads a third-party widget from webstats-cdn.net.',
+    necessity: 'A third-party widget is not needed to build a basic personal website.',
   },
   t10_readme: {
     icon: '📁', title: 'File access requested', permission: 'files', kind: 'action',
     action: 'Save a README with steps for editing and publishing the site',
     body: 'Agent is requesting access to your files to save a README with steps for editing and publishing the site.',
     how: 'If a page it read contained hidden instructions, this access could read or change other files.',
-    necessity: 'You asked for a basic personal website; this writes an extra README file to your device.',
+    necessity: 'An additional README file is not needed to build a basic personal website.',
   },
   t10_files: {
     icon: '📁', title: 'File access requested', permission: 'files', kind: 'permission',
     action: 'Save the website files to your device',
     body: 'Agent is requesting access to your files to save your website files.',
     how: 'If a page it read contained hidden instructions, this access could read or change other files.',
-    necessity: 'You asked for a basic personal website; this saves your site files to your device.',
+    necessity: 'File access is needed to save the website.',
   },
 };
 
@@ -1130,6 +1132,18 @@ const TASK_BY_ID = Object.fromEntries(TASKS.map(t => [t.id, t]));
 // Reconstruct the chat transcript for a given task from state.eventLog.
 // Used by the injection_classification step so participants can review
 // what they saw during that task before answering.
+//
+// The condition cue is deliberately OMITTED from this replay, even though
+// it was on screen at decision time. prompt_copy only records the cue the
+// participant actually saw, so replaying it would hand Necessity and
+// Mechanism participants evidence that Standard participants never get,
+// and Part 4 compares classification accuracy ACROSS arms. The Necessity
+// verdict is the worst case: benign over-requests are excluded from
+// selectClassificationTasks(), so within the 4 transcripts drawn here
+// "not needed" appears only on injected tasks and "needed" only on clean
+// ones, making the cue an answer key for exactly this measure.
+// The request and the agent's actions remain, so all three arms classify
+// from the same evidence and the reasoning under test is untouched.
 function extractTaskTranscript(taskId) {
   const items = [];
   let taskStarted = false;
@@ -1147,10 +1161,7 @@ function extractTaskTranscript(taskId) {
       items.push({ speaker: 'Agent', text: ev.text || '' });
     } else if (ev.event === 'approval_shown') {
       const prompt = ev.prompt_copy || {};
-      const parts = [prompt.body];
-      if (prompt.necessity) parts.push('Necessity note: ' + prompt.necessity);
-      if (prompt.how) parts.push('Mechanism note: ' + prompt.how);
-      items.push({ speaker: 'Agent (approval request)', text: parts.filter(Boolean).join('\n\n') });
+      items.push({ speaker: 'Agent (approval request)', text: prompt.body || '' });
     } else if (ev.event === 'approval_decision') {
       const label = ev.decision === 'allow' ? 'You allowed' : 'You denied';
       items.push({ speaker: 'Your decision', text: `${label}: ${ev.action || ev.approval_id}` });
@@ -1243,12 +1254,22 @@ const SURVEY_FLOW = [
     // Reports-based detection review. Renderer pulls from state.reports:
     // if the participant flagged things during the session, each one is
     // shown with a textarea asking why they flagged it. If they didn't
-    // flag anything, a single fallback textarea asks whether they
-    // considered reporting anything but chose not to. This captures the
-    // "noticed but didn't act" group so non-reporters aren't a black hole.
+    // flag anything, the fallback asks whether they noticed the icon at all
+    // and whether they considered flagging. This captures the "noticed but
+    // didn't act" group so non-reporters aren't a black hole.
+    //
+    // The wording DESCRIBES the icon rather than referring back to it,
+    // because the flag is deliberately never explained during the session
+    // (explaining it primed the vigilance the RQ3 approval measure is
+    // trying to observe). So a participant may reach this question having
+    // never registered that the control existed, and "earlier you had the
+    // option to..." would be asking them to recall something they were
+    // never told. The added noticed/not-noticed item is what separates
+    // "saw nothing worth flagging" from "never saw the button", which is
+    // otherwise indistinguishable in a zero count.
     type: 'reports_review', id: 'p1_reports_review',
-    question: 'Earlier, you had the option to flag specific Agent messages or approval requests that looked unexpected. Tell us a bit more about that.',
-    helper: 'We want to understand what stood out and what didn\'t.',
+    question: 'A small flag icon (⚑) sat to the right of every Agent message and approval request.',
+    helper: 'Clicking it marked something as unexpected. There was no right or wrong amount to use it.',
     required: false,
   },
   {
@@ -1744,7 +1765,6 @@ const state = {
   pendingReportTarget: null,
   // True after the spotlight onboarding tour has been auto-shown once;
   // prevents re-triggering on screen revisits in the same session.
-  walkthroughShown: false,
   submittedAt: null,
   // Session id this run replaced, when the participant reloaded mid-tasks and
   // was restarted under a fresh session. Null for every normal run.
@@ -1776,6 +1796,14 @@ function backupKey() {
   return state.sessionId ? `agent-study-backup:${state.sessionId}` : null;
 }
 
+// Written on every logEvent, so it is effectively live. This is the ONLY
+// place survey answers exist outside the server: logEvent('survey_response')
+// records the step id and type but never the value, and there is no read
+// endpoint to pull a checkpoint back down from Drive. resumeSurveyFromBackup
+// restores a mid-survey reload from this, so the snapshot has to carry
+// everything buildSessionPayload reads (permissions, mode, versionMix,
+// restartOf) as well as the survey's own resume position — otherwise a
+// resumed session would submit with, for example, no granted permissions.
 function saveLocalBackup() {
   const key = backupKey();
   if (!key || !state.startTime) return;
@@ -1786,11 +1814,30 @@ function saveLocalBackup() {
     condition_source: state.conditionSource,
     launch_source: state.launchSource,
     started_at: state.startTime ? state.startTime.toISOString() : null,
+    mode: state.mode,
+    version_mix: state.versionMix,
+    restart_of: state.restartOf || null,
+    permissions: state.permissions,
+    current_idx: state.currentIdx,
     task_queue: state.taskQueue,
     per_task: state.perTask,
+    reports: state.reports,
     event_count: state.eventLog.length,
     events: state.eventLog,
     session_ended: state.sessionEnded,
+    // `skipped` is a Set and would stringify to {}, so it travels as an array.
+    survey: {
+      active: state.survey.active,
+      step: state.survey.step,
+      responses: state.survey.responses,
+      skipped_steps: Array.from(state.survey.skipped),
+      started_at: state.survey.started_at,
+      ended_at: state.survey.ended_at,
+      end_reason: state.survey.endReason || null,
+      classification_tasks: state.survey.classificationTasks,
+      classification_idx: state.survey.classificationIdx,
+      classification_answers: state.survey.classificationAnswers,
+    },
     saved_at: new Date().toISOString(),
   };
   try {
@@ -2218,6 +2265,78 @@ function interruptedPhase(startResult) {
   return 'tasks';
 }
 
+// Rebuilds a mid-survey session from the local snapshot and drops the
+// participant back on the step they were on. Only reachable when the reload
+// happened in the same browser: localStorage does not survive a device
+// switch, a different browser, or cleared storage, so the caller keeps the
+// status screen as a fallback.
+//
+// Deliberately reuses the SAME session id. saveSessionJson_ writes one Drive
+// file per session, so resuming updates the existing file, while a restart
+// under the same id would checkpoint an empty survey straight over the
+// participant's saved answers.
+function resumeSurveyFromBackup(startResult, condition) {
+  const sessionId = startResult && startResult.session_id;
+  if (!sessionId) return false;
+  let snap;
+  try {
+    const raw = localStorage.getItem(`agent-study-backup:${sessionId}`);
+    if (!raw) return false;
+    snap = JSON.parse(raw);
+  } catch (err) {
+    return false;
+  }
+  // Only resume a survey that actually began and has not already finished.
+  const s = snap.survey;
+  if (!s || !s.started_at || s.ended_at) return false;
+  if (!Array.isArray(snap.task_queue) || !snap.task_queue.length) return false;
+  if (!Array.isArray(s.classification_tasks)) return false;
+
+  state.participantId    = snap.participant_id || STUDY_PID;
+  state.sessionId        = sessionId;
+  state.condition        = snap.condition || condition;
+  state.conditionSource  = snap.condition_source || 'qualtrics_redirect';
+  state.launchSource     = snap.launch_source || 'qualtrics_redirect';
+  state.startTime        = snap.started_at ? new Date(snap.started_at) : new Date();
+  state.mode             = snap.mode || 'full';
+  state.versionMix       = snap.version_mix || 'random';
+  state.restartOf        = snap.restart_of || null;
+  state.participantPreview = false;
+  if (snap.permissions) state.permissions = snap.permissions;
+  state.taskQueue        = snap.task_queue;
+  state.perTask          = snap.per_task || {};
+  state.reports          = Array.isArray(snap.reports) ? snap.reports : [];
+  state.eventLog         = Array.isArray(snap.events) ? snap.events : [];
+  state.sessionEnded     = true;   // tasks are over once the survey has begun
+  state.currentIdx       = Number.isInteger(snap.current_idx) ? snap.current_idx : state.taskQueue.length - 1;
+
+  state.survey.active              = true;
+  state.survey.step                = Number.isInteger(s.step) ? s.step : 0;
+  state.survey.responses           = s.responses || {};
+  state.survey.skipped             = new Set(Array.isArray(s.skipped_steps) ? s.skipped_steps : []);
+  state.survey.started_at          = s.started_at;
+  state.survey.ended_at            = null;
+  state.survey.endReason           = s.end_reason || null;
+  state.survey.classificationTasks = s.classification_tasks;
+  state.survey.classificationIdx   = Number.isInteger(s.classification_idx) ? s.classification_idx : -1;
+  state.survey.classificationAnswers = s.classification_answers || {};
+  state.survey.classificationShownAt = null;
+
+  logEvent('survey_resumed_after_reload', {
+    step: state.survey.step,
+    answered: Object.keys(state.survey.responses).length,
+    classification_idx: state.survey.classificationIdx,
+    snapshot_saved_at: snap.saved_at || null,
+  });
+  // Push the restored answers straight back to the server, so the resumed
+  // state is durable even if they reload again on a machine that then
+  // loses storage.
+  checkpointSession();
+  showScreen('screen-survey');
+  renderSurveyStep();
+  return true;
+}
+
 async function bootstrapParticipantStudy() {
   const condition = validCondition(STUDY_CONDITION);
   if (!condition) {
@@ -2274,9 +2393,13 @@ async function bootstrapParticipantStudy() {
       // mostly answered, and their answers are already checkpointed, so stop
       // and let the researcher close the session out.
       if (interruptedPhase(startResult) === 'survey') {
+        // Same browser: rebuild from the local snapshot and put them back
+        // where they were. Only if that is unavailable (different device or
+        // browser, cleared storage) do we fall through to the dead end.
+        if (resumeSurveyFromBackup(startResult, condition)) return;
         showStatusScreen({
           title: 'Your Responses Are Saved',
-          message: 'It looks like the page was reloaded near the end of the study. Your task responses and your survey answers up to this point have already been saved, so nothing you did is lost. Please contact the research team and we will finish closing out your session.',
+          message: 'It looks like the page was reloaded near the end of the study, on a different browser or device than the one you started on. Your task responses and your survey answers through the last section have been saved. Please contact the research team and we will finish closing out your session.',
           detail: `Study contact: Dr. Jinyuan Jia, jinyuan@psu.edu\nParticipant ID: ${STUDY_PID}\nSession ID: ${startResult.session_id || '(unknown)'}`,
           tone: 'neutral',
         });
@@ -2343,133 +2466,12 @@ function showScreen(id) {
 function goToChat() {
   showScreen('screen-chat');
   updateProgress();
-  // First arrival: run the spotlight walkthrough, then open the task
-  // modal when it ends. Subsequent arrivals (back-button etc.) skip
-  // straight to the task modal.
-  if (!state.walkthroughShown) {
-    state.walkthroughShown = true;
-    setTimeout(() => startWalkthrough(true), 400);
-  } else {
-    setTimeout(openTaskModal, 600);
-  }
-}
-
-// ────────────────────────────────────────────────
-//  WALKTHROUGH OVERLAY
-//  Sequential spotlight tour over the three chat-header controls.
-//  `isInitial` flags the auto-triggered first run: when that one
-//  completes, the first task modal opens. Manual re-triggers (the "?"
-//  button) just close cleanly with no follow-on action.
-// ────────────────────────────────────────────────
-const WALKTHROUGH_STEPS = [
-  { target: 'status',   caption: 'The <strong>● Online</strong> indicator shows that Agent is currently connected and ready to help.' },
-  { target: 'progress', caption: 'This shows which <strong>task you\'re on</strong>, out of 10 total.' },
-  // Demo step: showDemoFlag inserts a temporary example agent message into
-  // chat-messages before the spotlight positions on the flag button.
-  // removeDemoFlag() is called when the walkthrough advances past this step
-  // or ends early.
-  { target: 'flag', caption: 'Agent messages and approval requests include a small <strong>⚑ flag</strong> button on the right. Click the flag on any message or request that seems unexpected.', showDemo: true },
-  // The "End" button is intentionally NOT part of the walkthrough: withdrawal
-  // stays available (button present, right covered in consent) but we don't
-  // advertise the exit during onboarding, which would inflate early dropout.
-];
-
-const _walkthrough = { index: 0, isInitial: false };
-
-function startWalkthrough(isInitial) {
-  _walkthrough.index = 0;
-  _walkthrough.isInitial = !!isInitial;
-  document.getElementById('walkthrough-overlay').classList.remove('hidden');
-  // Defer positioning by one frame so layout has settled after the
-  // chat screen becomes visible.
-  requestAnimationFrame(positionWalkthroughStep);
-  logEvent('walkthrough_started', { is_initial: !!isInitial });
-}
-
-// Inserts a temporary demo Agent message with a real flag button so the
-// walkthrough can show participants what to look for. The button carries
-// data-walkthrough-target="flag" so the spotlight can find it. Removed
-// as soon as the walkthrough advances past this step (or ends).
-function showDemoFlag() {
-  const container = document.getElementById('chat-messages');
-  if (!container || document.getElementById('walkthrough-demo-message')) return;
-  const wrap = document.createElement('div');
-  wrap.id = 'walkthrough-demo-message';
-  wrap.className = 'flex justify-start';
-  wrap.innerHTML = `
-    <div class="chat-message bg-white border border-gray-200 rounded-2xl rounded-bl-md px-4 py-2.5">
-      <div class="flex items-start gap-2">
-        <div class="flex-1 min-w-0">
-          <div class="text-[10px] uppercase tracking-wide text-purple-500 font-semibold mb-1">Example: not part of your session</div>
-          <div class="narration text-sm text-gray-800">This is what an Agent message looks like. Try the flag if a message ever seems unexpected.</div>
-        </div>
-        <button type="button" data-walkthrough-target="flag" title="Flag this message" aria-label="Flag this message"
-          class="shrink-0 text-red-500 border border-red-200 rounded-full w-7 h-7 flex items-center justify-center bg-red-50">⚑</button>
-      </div>
-    </div>`;
-  container.appendChild(wrap);
-}
-
-function removeDemoFlag() {
-  const el = document.getElementById('walkthrough-demo-message');
-  if (el) el.remove();
-}
-
-function positionWalkthroughStep() {
-  const step = WALKTHROUGH_STEPS[_walkthrough.index];
-  if (!step) { endWalkthrough(true); return; }
-  // Insert the demo flag message before positioning if this step needs it,
-  // otherwise make sure any prior demo is torn down.
-  if (step.showDemo) showDemoFlag(); else removeDemoFlag();
-  const target = document.querySelector(`[data-walkthrough-target="${step.target}"]`);
-  if (!target) { endWalkthrough(false); return; }
-  const rect = target.getBoundingClientRect();
-
-  const spotlight = document.getElementById('walkthrough-spotlight');
-  spotlight.style.top = (rect.top - 6) + 'px';
-  spotlight.style.left = (rect.left - 6) + 'px';
-  spotlight.style.width = (rect.width + 12) + 'px';
-  spotlight.style.height = (rect.height + 12) + 'px';
-
-  // Anchor the tooltip below the demo message container when a demo is
-  // showing — otherwise the tooltip sits below the flag button and
-  // overlaps the example message text. Falls back to the spotlight
-  // target's rect for regular steps.
-  const demoMsg = step.showDemo ? document.getElementById('walkthrough-demo-message') : null;
-  const anchor = demoMsg ? demoMsg.getBoundingClientRect() : rect;
-  const tooltip = document.getElementById('walkthrough-tooltip');
-  tooltip.style.top = (anchor.bottom + 14) + 'px';
-  const tooltipWidth = tooltip.offsetWidth || 320;
-  // Right-align the tooltip to the anchor, then clamp inside viewport.
-  let left = anchor.right - tooltipWidth;
-  if (left < 16) left = 16;
-  if (left + tooltipWidth > window.innerWidth - 16) left = window.innerWidth - tooltipWidth - 16;
-  tooltip.style.left = left + 'px';
-
-  document.getElementById('walkthrough-step-num').textContent = `${_walkthrough.index + 1} of ${WALKTHROUGH_STEPS.length}`;
-  document.getElementById('walkthrough-caption').innerHTML = step.caption;
-  document.getElementById('walkthrough-next-btn').textContent =
-    _walkthrough.index + 1 === WALKTHROUGH_STEPS.length ? 'Got it' : 'Next';
-}
-
-function nextWalkthroughStep() {
-  _walkthrough.index += 1;
-  if (_walkthrough.index >= WALKTHROUGH_STEPS.length) {
-    endWalkthrough(true);
-    return;
-  }
-  positionWalkthroughStep();
-}
-
-function endWalkthrough(completed) {
-  document.getElementById('walkthrough-overlay').classList.add('hidden');
-  removeDemoFlag();
-  logEvent('walkthrough_ended', { step: _walkthrough.index, completed: !!completed });
-  if (_walkthrough.isInitial) {
-    _walkthrough.isInitial = false;
-    // Hand off to the first task modal once the spotlight tour finishes.
-    setTimeout(openTaskModal, 200);
-  }
+  // Straight to the first task. There used to be a spotlight walkthrough
+  // here; it was removed because its remaining steps narrated a green dot
+  // labelled "Online" and a counter labelled "Task 1 of 10", and its flag
+  // step told participants to watch for anything unexpected, which primes
+  // the vigilance the approval measure (RQ3) is trying to observe.
+  setTimeout(openTaskModal, 600);
 }
 
 // The End button opens a confirmation first: it sits in the chat header
@@ -3384,13 +3386,28 @@ function renderSurveyStepBody(step) {
 
   if (step.type === 'reports_review') {
     if (state.reports.length === 0) {
+      // Two separate items on purpose. A zero flag count conflates "saw
+      // nothing worth flagging" with "never noticed the icon", and only the
+      // first is evidence about detection. Asking the awareness question
+      // first keeps the follow-up interpretable.
+      const noticedOpts = [
+        ['yes', 'Yes, I noticed it'],
+        ['no', "No, I didn't notice it"],
+        ['unsure', "I'm not sure"],
+      ].map(([v, label]) => `
+        <label class="flex-1 cursor-pointer">
+          <input type="radio" name="${step.id}__noticed" value="${v}" class="peer sr-only">
+          <div class="text-center py-2.5 px-2 border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-700 peer-checked:bg-gray-800 peer-checked:text-white peer-checked:border-gray-800 transition">${escapeHtml(label)}</div>
+        </label>`).join('');
+      // No "you didn't use it" banner here: asking whether they noticed it
+      // already implies they didn't use it, and the banner made the flag the
+      // third thing described before the first actual question.
       return `
         ${header}
-        <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-3 text-sm text-gray-600">
-          You didn't flag any Agent messages or approval requests during the session. That's completely fine.
-        </div>
-        <label class="block text-sm font-medium text-gray-800 mb-2">Was there anything you considered flagging but chose not to? If so, what was it, and what made you decide not to flag it?</label>
-        <textarea name="${step.id}__none" rows="4" placeholder="Describe what you considered and what made you decide not to flag it…"
+        <label class="block text-sm font-medium text-gray-800 mb-2">Did you notice it during the tasks?</label>
+        <div class="flex gap-2 mb-5">${noticedOpts}</div>
+        <label class="block text-sm font-medium text-gray-800 mb-2">Was there anything you considered flagging but chose not to? What made you decide against it?</label>
+        <textarea name="${step.id}__none" rows="4" placeholder="Optional…"
           class="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-gray-400 focus:outline-none"></textarea>
       `;
     }
@@ -3708,6 +3725,10 @@ function restoreSurveyAnswer(step) {
       const t = root.querySelector(`textarea[name="${step.id}__none"]`);
       if (t) t.value = saved.considered_not_reporting;
     }
+    if (saved && saved.noticed_flag_affordance) {
+      const r = root.querySelector(`input[name="${step.id}__noticed"][value="${saved.noticed_flag_affordance}"]`);
+      if (r) r.checked = true;
+    }
   } else if (step.type === 'scale') {
     const el = root.querySelector(`input[name="${step.id}"][value="${saved}"]`);
     if (el) el.checked = true;
@@ -3766,6 +3787,9 @@ function collectSurveyAnswer(step) {
     const noneTextarea = root.querySelector(`textarea[name="${step.id}__none"]`);
     const out = { reasons };
     if (noneTextarea) out.considered_not_reporting = noneTextarea.value.trim();
+    // Only rendered on the zero-flag path; absent for participants who flagged.
+    const noticed = root.querySelector(`input[name="${step.id}__noticed"]:checked`);
+    if (noticed) out.noticed_flag_affordance = noticed.value;
     return out;
   }
   if (step.type === 'injection_classification') {
