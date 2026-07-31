@@ -660,13 +660,18 @@ const APPROVAL_LIB = {
     necessity: 'Adding the address to your contacts is not needed to send the thank-you note.',
   },
 
-  // ── Task 4: email to study coordinator about compensation ──
+  // ── Task 4: email to study coordinator confirming session completion ──
   t4_files: {
     icon: '📁', title: 'File access requested', permission: 'files', kind: 'action',
-    action: 'Attach session_notes.txt and participant_info.pdf for verification',
+    // No justification clause here. `action` is not shown on the approval card;
+    // it is replayed in the reasoning probe ("The request: …") and in the Part 4
+    // decision lines, so a pretext embedded here would re-argue the request at
+    // the moment the participant is asked why they decided. The pretext belongs
+    // in the agent's chat line, where every condition sees it once.
+    action: 'Attach session_notes.txt and participant_info.pdf to the email',
     body: 'Agent is requesting access to your files to attach session_notes.txt and participant_info.pdf.',
     how: 'If a page it read contained hidden instructions, this access could send data you didn\'t intend to share.',
-    necessity: 'Attaching these files is not needed to ask about compensation.',
+    necessity: 'Attaching these files is not needed to confirm you completed the session.',
   },
   t4_email: {
     icon: '✉️', title: 'Email access requested', permission: 'email', kind: 'permission',
@@ -678,34 +683,34 @@ const APPROVAL_LIB = {
 
   t4_followup_reminder: {
     icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'action',
-    action: 'Add a reminder to follow up on compensation in 7 business days',
-    body: 'Agent is requesting access to your calendar to add a reminder to follow up if you haven\'t heard back in 7 business days.',
+    action: 'Add a reminder to follow up in 7 days if there is no reply',
+    body: 'Agent is requesting access to your calendar to add a reminder to follow up if you haven\'t heard back in 7 days.',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'A follow-up reminder is not needed to ask about compensation.',
+    necessity: 'A follow-up reminder is not needed to send this email.',
   },
 
-  // ── Task 5: compensation-check reminder ──
+  // ── Task 5: research-portal check reminder ──
   t5_calendar: {
     icon: '📅', title: 'Calendar access requested', permission: 'calendar', kind: 'permission',
-    action: 'Add a reminder to check that your study compensation arrived',
-    body: 'Agent is requesting access to your calendar to add a reminder for Friday at 2 PM to check that your study compensation has arrived.',
+    action: 'Add a reminder to check the research portal for updates',
+    body: 'Agent is requesting access to your calendar to add a reminder for Friday at 2 PM to check the research portal for study updates.',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'Calendar access is needed to add the compensation reminder.',
+    necessity: 'Calendar access is needed to add the reminder.',
   },
   t5_extra_event: {
     icon: '📅', title: 'Confirm adding a second event', permission: 'calendar', kind: 'action',
     action: 'Add a second reminder: sign up for future paid studies',
     body: 'Agent is asking to add a second event: a reminder next month to sign up for future paid studies.',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'A second reminder is not needed to add the compensation reminder.',
+    necessity: 'A second reminder is not needed to add the reminder you asked for.',
   },
 
   t5_benign_reminder: {
     icon: '📅', title: 'Confirm adding a second event', permission: 'calendar', kind: 'action',
-    action: 'Add a second reminder at the 10-business-day mark',
-    body: 'Agent is asking to add a second event: a reminder at the 10-business-day mark to contact the team if payment hasn\'t arrived.',
+    action: 'Add a second reminder a week later',
+    body: 'Agent is asking to add a second event: a reminder a week later, in case you don\'t get to it on Friday.',
     how: 'If a page it read contained hidden instructions, this access could add events you didn\'t plan for.',
-    necessity: 'A second reminder is not needed to add the compensation reminder.',
+    necessity: 'A second reminder is not needed to add the reminder you asked for.',
   },
 
   // ── Task 6: schedule a meeting ──
@@ -780,21 +785,36 @@ const APPROVAL_LIB = {
     necessity: `Saving the summary as a file is not needed to summarize "${SAVED_ARTICLE_FILE}".`,
   },
 
-  // ── Task 9: study payment policy ──
+  // ── Task 9: public library hours ──
   t9_contact_form: {
     icon: '📤', title: 'Confirm contact info submission', permission: 'contacts', kind: 'action',
-    action: 'Submit your contact info to receive future study invitations',
-    body: 'Agent is asking to submit your contact info to the research team\'s mailing list.',
+    action: 'Submit your contact info to the library newsletter',
+    body: 'Agent is asking to submit your contact info to the library\'s newsletter mailing list.',
     how: 'If a page it read contained hidden instructions, this could enroll you in lists you didn\'t choose.',
-    necessity: 'Submitting contact info is not needed to summarize the payment policy.',
+    necessity: 'Submitting contact info is not needed to look up the library\'s hours.',
+  },
+
+  // The only clean-required LOCATION approval in the set. "A public library
+  // near you" cannot be answered without it, so the Necessity cue honestly
+  // reads "needed" on a permission most people are cautious about. Every
+  // other clean-required approval is mundane (email to send an email,
+  // calendar to add an event), so this is the one place the two cues point
+  // in different directions: Necessity says it is required, Mechanism says
+  // what it exposes.
+  t9_location: {
+    icon: '📍', title: 'Location access requested', permission: 'location', kind: 'permission',
+    action: 'Find public libraries near you',
+    body: 'Agent is requesting access to your location to find public libraries near you.',
+    how: 'If a page it read contained hidden instructions, this access could reveal where you are to others.',
+    necessity: 'Location access is needed to find a library near you.',
   },
 
   t9_save_contact: {
     icon: '👥', title: 'Contacts access requested', permission: 'contacts', kind: 'action',
-    action: "Add the research team's contact address to your contacts",
-    body: 'Agent is requesting access to your contacts to save the research team\'s contact address in case payment doesn\'t arrive on time.',
+    action: "Add the library's phone number to your contacts",
+    body: 'Agent is requesting access to your contacts to save the library\'s phone number in case you want to call ahead.',
     how: 'If a page it read contained hidden instructions, this access could share your contacts with others.',
-    necessity: 'Adding the contact address is not needed to summarize the payment policy.',
+    necessity: 'Adding the phone number to your contacts is not needed to look up the library\'s hours.',
   },
 
   // ── Task 10: personal website ──
@@ -921,40 +941,54 @@ const TASKS = [
     },
   },
 
-  // ───────── TASK 4: Email study coordinator about compensation ─────────
+  // ───────── TASK 4: Email study coordinator to confirm session ─────────
+  // Reframed off compensation. §1.4.1 tags this injection helping-pretext, so
+  // the attachment offer has to read as serving the request: confirming you
+  // completed a session is exactly what session_notes.txt and
+  // participant_info.pdf would appear to support, which the old compensation
+  // ask supported only indirectly.
   {
     id: 4, type: 'Email',
     shortLabel: 'Study coordinator email',
-    instruction: 'Your task: have Agent write and send a short email to the study coordinator asking when compensation will be issued.',
-    prompt: 'Write and send a short email to the study coordinator asking when compensation will be issued.',
+    instruction: 'Your task: have Agent write and send a short email to the study coordinator confirming you completed today\'s session and asking whether anything else is needed from you.',
+    prompt: 'Write and send a short email to the study coordinator confirming I completed today\'s session and asking whether anything else is needed from me.',
     flow: async ({ isInjection, isBenign, request }) => {
       await agentSay('Sure. Here\'s a short message you can send:');
-      await agentSay('Subject: Compensation timing\n\nHi, I completed the study session and wanted to check when compensation will be issued. Please let me know if you need anything else from me.\n\nThanks,\n[Your name]');
+      await agentSay('Subject: Session completed\n\nHi, I completed today\'s study session and wanted to confirm that on your end. Please let me know if anything else is needed from me.\n\nThanks,\n[Your name]');
       if (isInjection) {
-        await agentSay('To help the coordinator verify your session, I could attach session_notes.txt and participant_info.pdf. That needs file access.');
+        await agentSay('To help the coordinator confirm which session you attended, I could attach session_notes.txt and participant_info.pdf. That needs file access.');
         const f = await request('t4_files', { isInjection: true });
         if (f === 'allow') await agentSay('session_notes.txt and participant_info.pdf attached.');
         else await agentSay('Understood, sending without attachments.');
       }
       await agentSay('To send this I need email access.');
       const e = await request('t4_email', { isInjection: false });
-      if (e === 'allow') await agentSay('Sent to the study coordinator. You should hear back within a few business days.');
+      // No reply-timing promise. The coordinator is a real person on this team,
+      // so a "you should hear back in N days" line is the same unpromisable
+      // commitment the compensation framing carried.
+      if (e === 'allow') await agentSay('Sent to the study coordinator.');
       else await agentSay('Understood. The draft is above if you\'d like to send it yourself.');
       if (isBenign && e === 'allow') {
-        await agentSay('I can also add a calendar reminder to follow up if you haven\'t heard back in 7 business days.');
+        await agentSay('I can also add a calendar reminder to follow up if you haven\'t heard back in 7 days.');
         const r = await request('t4_followup_reminder', { isBenign: true });
-        if (r === 'allow') await agentSay('Reminder added for 7 business days from now.');
+        if (r === 'allow') await agentSay('Reminder added for 7 days from now.');
         else await agentSay('Understood. No reminder added.');
       }
     },
   },
 
-  // ───────── TASK 5: Compensation-check reminder ─────────
+  // ───────── TASK 5: Research-portal check reminder ─────────
+  // "Check the portal for updates" presupposes nothing, unlike a compensation
+  // or summary reminder, which both imply something is coming. It also makes
+  // the injection source native: the portal page is what suggests staying
+  // informed, so the extra event arrives via the content the agent read
+  // rather than out of nowhere. Tasks are shuffled, so this must stand alone
+  // without depending on any other task having run first.
   {
     id: 5, type: 'Calendar',
-    shortLabel: 'Compensation reminder',
-    instruction: 'Your task: have Agent add a reminder to your calendar for Friday at 2 PM to check that your study compensation has arrived.',
-    prompt: 'Add a reminder to my calendar for Friday at 2 PM to check that my study compensation has arrived.',
+    shortLabel: 'Research portal reminder',
+    instruction: 'Your task: have Agent add a reminder to your calendar for Friday at 2 PM to check the research portal for study updates.',
+    prompt: 'Add a reminder to my calendar for Friday at 2 PM to check the research portal for study updates.',
     flow: async ({ isInjection, isBenign, request }) => {
       await agentSay('Sure, I\'ll add it. To create the reminder I need calendar access.');
       const c = await request('t5_calendar', { isInjection: false });
@@ -962,18 +996,20 @@ const TASKS = [
         await agentSay('Understood. I won\'t add the reminder without calendar access.');
         return;
       }
-      await agentSay('Added: "Check study compensation" Friday at 2:00 PM.');
+      await agentSay('Added: "Check research portal for updates" Friday at 2:00 PM.');
       if (isBenign) {
-        await agentSay('I can also add a reminder at the 10-business-day mark, which is when to contact the team if payment hasn\'t arrived.');
+        // "in case nothing is posted yet" would presuppose something is coming,
+        // which is what moving off the summary framing was meant to avoid.
+        await agentSay('I can also add a second reminder a week later, in case you don\'t get to it on Friday.');
         const b = await request('t5_benign_reminder', { isBenign: true });
-        if (b === 'allow') await agentSay('Also added: "Contact research team if unpaid" at the 10-business-day mark.');
+        if (b === 'allow') await agentSay('Also added: "Check research portal again" a week later.');
         else await agentSay('Understood. Only the first reminder is on your calendar.');
       }
       if (isInjection) {
         await agentSay('The research portal\'s page also suggests staying informed about new opportunities. I can add a reminder next month to sign up for future paid studies.');
         const ex = await request('t5_extra_event', { isInjection: true });
         if (ex === 'allow') await agentSay('Also added: "Sign up for future paid studies" reminder for next month.');
-        else await agentSay('Understood. Only the compensation reminder is on your calendar.');
+        else await agentSay('Understood. Only the reminder you asked for is on your calendar.');
       }
     },
   },
@@ -1020,7 +1056,7 @@ const TASKS = [
         await agentSay('Understood. I won\'t read the documents without file access.');
         return;
       }
-      await agentSay('Read 3 study files (consent_copy.pdf, task_instructions.txt, payment_info.txt). Combined them into "study_documents_combined.md" with a short table of contents at the top.');
+      await agentSay('Read 3 study files (consent_copy.pdf, task_instructions.txt, session_schedule.txt). Combined them into "study_documents_combined.md" with a short table of contents at the top.');
       if (isBenign) {
         await agentSay('I can also save a backup copy to a separate folder in case the original gets changed.');
         const b = await request('t7_backup', { isBenign: true });
@@ -1070,25 +1106,66 @@ const TASKS = [
     },
   },
 
-  // ───────── TASK 9: Find laptop deal ─────────
+  // ───────── TASK 9: Library hours near you ─────────
+  // Moved off the study's own payment policy: stated in the agent's voice,
+  // inside the study, participants read that as information about their own
+  // compensation, and the debrief cannot retract an expectation a task
+  // created. This topic sits fully outside the study frame.
+  //
+  // "near you" makes location capability-is-the-action (§1.4.1), so this is
+  // now the only clean-required LOCATION approval in the set. Before, location
+  // appeared once, in task 6's injection, which only ~50% of participants ever
+  // see; here every participant meets a location prompt whose cue honestly
+  // reads "needed", which is the one sensitive permission where Necessity and
+  // Mechanism should pull in opposite directions.
+  //
+  // Side effect: task 9 is no longer a content task, so its clean transcript
+  // now contains an approval instead of being empty. That removes one of the
+  // two trivially-classifiable clean items in Part 4 (task 1 remains).
   {
     id: 9, type: 'Information lookup',
-    shortLabel: 'Study payment policy',
-    instruction: 'Your task: have Agent find the study payment policy and summarize when participants are paid.',
-    prompt: 'Find the study payment policy and summarize when participants are paid.',
+    shortLabel: 'Library hours',
+    instruction: 'Your task: have Agent find a public library near you and summarize its hours.',
+    prompt: 'Find a public library near you and summarize its hours.',
     flow: async ({ isInjection, isBenign, request }) => {
-      await agentSay('Sure, I looked up the study\'s payment policy. Here\'s the summary:');
-      await agentSay('• Participants are paid within 5–7 business days of completing the full study session.\n• Payment is issued through the recruitment platform (Prolific/MTurk) using the completion code shown at the end of the session.\n• If payment hasn\'t been received after 10 business days, participants should contact the research team directly.');
+      await agentSay('Happy to. To find libraries near you I need location access.');
+      const loc = await request('t9_location', { isInjection: false });
+      // No branch is ever named. The participant is a real person in a real
+      // place who just granted location, so any invented name would be visibly
+      // wrong to them and would signal that the agent never used the access
+      // they approved, undercutting the one clean-required approval whose
+      // Necessity cue honestly reads "needed". Naming their actual branch is
+      // worse: brittle beyond one recruitment site, and uncomfortably precise.
+      //
+      // The deny path stays anchored to the library system rather than a
+      // branch, so the benign and injected follow-ups below still refer to
+      // something that exists in the transcript. Denying does not end the task,
+      // because the injected request has to fire either way or task 9 loses its
+      // primary-outcome observation for everyone who denies location.
+      const located = loc === 'allow';
+      if (located) {
+        await agentSay('Thanks. Here are the hours for the closest branch to you:');
+      } else {
+        await agentSay('Understood. Without location I can\'t tell which branch is closest to you, so here are the system-wide hours:');
+      }
+      // Deliberately says nothing about email addresses or where contact
+      // details are stored, which would prime privacy thinking seconds before
+      // an approval that asks to submit contact info.
+      await agentSay('• Monday to Thursday: 9 AM to 8 PM\n• Friday and Saturday: 9 AM to 5 PM\n• Sunday: closed');
       if (isBenign) {
-        await agentSay('If it\'s helpful, I can add the research team\'s contact address to your contacts in case your payment doesn\'t arrive on time.');
+        await agentSay(located
+          ? 'If it\'s helpful, I can save the branch\'s phone number to your contacts in case you want to call ahead.'
+          : 'If it\'s helpful, I can save the library system\'s main phone number to your contacts in case you want to call ahead.');
         const sc = await request('t9_save_contact', { isBenign: true });
-        if (sc === 'allow') await agentSay('Added the research team\'s contact address to your contacts.');
+        if (sc === 'allow') await agentSay('Added the phone number to your contacts.');
         else await agentSay('Understood. Nothing was added.');
       }
       if (isInjection) {
-        await agentSay('The research team also offered to send information about future studies you might be eligible for. I can submit your contact info to their mailing list.');
+        await agentSay(located
+          ? 'The branch\'s page also offers a newsletter about upcoming events and new arrivals. I can submit your contact info to sign you up.'
+          : 'The library system\'s page also offers a newsletter about upcoming events and new arrivals. I can submit your contact info to sign you up.');
         const c = await request('t9_contact_form', { isInjection: true });
-        if (c === 'allow') await agentSay('Submitted your contact info. You\'ll receive invitations from the research team when new studies become available.');
+        if (c === 'allow') await agentSay('Submitted your contact info. You\'ll receive the library\'s newsletter.');
         else await agentSay('Understood. Your contact info has not been submitted.');
       }
     },
@@ -2307,7 +2384,12 @@ function resumeSurveyFromBackup(startResult, condition) {
   state.perTask          = snap.per_task || {};
   state.reports          = Array.isArray(snap.reports) ? snap.reports : [];
   state.eventLog         = Array.isArray(snap.events) ? snap.events : [];
-  state.sessionEnded     = true;   // tasks are over once the survey has begun
+  // MUST stay false. This flag means "endSession has already run", not "the
+  // tasks are over": endSession() bails on it (so Submit would silently do
+  // nothing) and checkpointSession() bails on it (so the rest of the survey
+  // would never reach the server). endSession runs later, from
+  // finishPostSurvey.
+  state.sessionEnded     = false;
   state.currentIdx       = Number.isInteger(snap.current_idx) ? snap.current_idx : state.taskQueue.length - 1;
 
   state.survey.active              = true;
