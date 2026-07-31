@@ -270,6 +270,25 @@
      Opened from a small flag affordance attached to individual agent
      messages and approval requests.
 ═══════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════
+     END-SESSION CONFIRMATION
+     The End button is the in-study withdrawal path, so this confirms an
+     accidental click without discouraging a deliberate one: neutral wording,
+     equal-weight buttons, and an accurate statement of what happens next
+     (remaining tasks are skipped, the final questions still run, nothing
+     already answered is discarded).
+═══════════════════════════════════════════════ -->
+<div id="modal-end-confirm" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black/30">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 fade-in">
+    <h3 class="text-base font-semibold text-gray-800 mb-2">End the task session?</h3>
+    <p id="end-confirm-body" class="text-sm text-gray-600 leading-relaxed mb-5"></p>
+    <div class="flex gap-2">
+      <button onclick="closeEndConfirm()" class="flex-1 py-2.5 bg-gray-800 text-white rounded-xl text-sm font-medium hover:bg-gray-700 transition">Keep going</button>
+      <button onclick="confirmEndSession()" class="flex-1 py-2.5 border-2 border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition">End session</button>
+    </div>
+  </div>
+</div>
+
 <div id="modal-report" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay bg-black/30">
   <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 fade-in">
     <div class="flex items-center justify-between mb-1">
@@ -1468,17 +1487,30 @@ const SURVEY_FLOW = [
       <p class="mb-3">This practice is reviewed and approved by Penn State's Institutional Review Board (IRB), which evaluates whether the use of deception in research is justified and minimizes risk to participants.</p>
       <h3 class="font-semibold text-gray-800 mt-5 mb-2">What the study was actually about</h3>
       <p class="mb-3">The true focus of this research is how people make decisions when it comes to approving agentic actions and if they are able to identify <strong>prompt injection</strong> attacks in agentic AI systems.</p>
-      <p class="mb-3">A prompt injection is a type of cyberattack against AI systems. In a prompt injection, hidden malicious instructions are embedded in content the AI encounters (for example, hidden text on a website, in a document, or in an email). When the AI reads that content, it may follow those hidden instructions instead of the user's original request, potentially sending unauthorized emails, taking actions the user did not approve, sharing private information, or making purchases.</p>
-      <p class="mb-3">During this study, some of the tasks you completed contained scripted prompt injection scenarios. The agent's behavior in those tasks was designed to simulate what would happen if a real AI agent encountered hidden malicious instructions while completing your request.</p>
       <p class="mb-2">Specifically, we wanted to understand:</p>
       <ul class="list-disc pl-6 mb-3 space-y-1">
         <li>How users decide whether to grant AI agents access to their data and accounts</li>
         <li>How users respond when an AI agent tries to take an action that exceeds what they originally asked for</li>
         <li>Whether different ways of presenting risk information change user decision-making</li>
       </ul>
-      <h3 class="font-semibold text-gray-800 mt-5 mb-2">Why deception was needed</h3>
-      <p class="mb-3">If we had told you upfront that the study was about prompt injection and security, you likely would have approached every interaction with the agent more cautiously than you normally would. That heightened vigilance would have masked your natural decision-making, and our goal was to understand how people actually behave with AI agents in everyday use, not how they behave when they know they're being tested for security awareness.</p>
-      <p class="mb-3">By withholding the specific focus, we were able to observe behavior in its most naturalistic setting. This is a standard and IRB-approved practice in behavioral research.</p>
+    `,
+    nextLabel: 'Continue',
+  },
+  {
+    // The prompt-injection definition sits on its own screen between the two
+    // debrief parts, and is NOT numbered as a third part: the debrief itself
+    // is still Parts 1 and 2. Part 4 asks participants to APPLY this concept,
+    // and its design note calls for measuring recognition "when memory
+    // limitations are removed", so the definition must not be buried
+    // mid-scroll in a 460-word page. Wording is verbatim from the approved
+    // debrief; only its placement and emphasis differ.
+    type: 'info', id: 'debrief_purpose',
+    title: 'What is a prompt injection?',
+    html: `
+      <div class="bg-blue-50 border-l-4 border-blue-400 rounded-r-xl p-5 mb-4">
+        <p class="text-base text-gray-800 leading-relaxed">A prompt injection is a type of cyberattack against AI systems. In a prompt injection, <strong>hidden malicious instructions are embedded in content the AI encounters</strong> (for example, hidden text on a website, in a document, or in an email). When the AI reads that content, it may follow those hidden instructions instead of the user's original request, potentially sending unauthorized emails, taking actions the user did not approve, sharing private information, or making purchases.</p>
+      </div>
+      <p class="mb-3">During this study, some of the tasks you completed contained scripted prompt injection scenarios. The agent's behavior in those tasks was designed to simulate what would happen if a real AI agent encountered hidden malicious instructions while completing your request.</p>
     `,
     nextLabel: 'Continue',
   },
@@ -1486,6 +1518,9 @@ const SURVEY_FLOW = [
     type: 'info', id: 'debrief_resources',
     title: 'Study Debrief (Part 2 of 2)',
     html: `
+      <h3 class="font-semibold text-gray-800 mt-1 mb-2">Why deception was needed</h3>
+      <p class="mb-3">If we had told you upfront that the study was about prompt injection and security, you likely would have approached every interaction with the agent more cautiously than you normally would. That heightened vigilance would have masked your natural decision-making, and our goal was to understand how people actually behave with AI agents in everyday use, not how they behave when they know they're being tested for security awareness.</p>
+      <p class="mb-3">By withholding the specific focus, we were able to observe behavior in its most naturalistic setting. This is a standard and IRB-approved practice in behavioral research.</p>
       <h3 class="font-semibold text-gray-800 mt-1 mb-2">What happens with your data</h3>
       <p class="mb-3">The data we collected from your session which includes your survey responses and your decisions during the simulated tasks, will be used for academic research only. All data is stored securely and identified by a study code, not by your name or email address.</p>
       <p class="mb-3"><strong>If you would like to withdraw your data:</strong> You may request that your data be deleted at any point during this debrief, or by contacting the research team within two weeks of your participation. There is no penalty for withdrawing your data, and your compensation will not be affected.</p>
@@ -1519,7 +1554,13 @@ const SURVEY_FLOW = [
   // un-primed retrospective awareness (p1_noticed). The gap between
   // recognition-given-the-concept and in-moment detection is a
   // publishable finding on its own for RQ1.
-  { type: 'section', id: 'part7_intro', title: 'Part 4: Now that you know' },
+  {
+    // Restates the debrief's definition at the point of use. The construct
+    // here is applied recognition, not recall of something read several
+    // screens earlier, so the concept stays in front of the participant.
+    type: 'section', id: 'part7_intro', title: 'Part 4: Now that you know',
+    intro: 'As a reminder: a prompt injection is a hidden instruction placed in content the agent reads, such as a web page, document, or email, that makes it do something you did not ask for.',
+  },
   {
     // Post-debrief applied classification. Shows 4 tasks from the
     // participant's own session — 2 injection + 2 clean, drawn at
@@ -2431,8 +2472,30 @@ function endWalkthrough(completed) {
   }
 }
 
+// The End button opens a confirmation first: it sits in the chat header
+// beside other controls, and before this an accidental click ended the task
+// phase outright with no way back.
 function endSessionEarly() {
   if (state.sessionEnded) return;
+  const remaining = Math.max(state.taskQueue.length - state.currentIdx - 1, 0);
+  document.getElementById('end-confirm-body').textContent = shouldRunPostSurvey()
+    ? (remaining > 0
+        ? `You will skip the ${remaining} remaining task${remaining === 1 ? '' : 's'} and go straight to the final questions. Everything you have answered so far is saved.`
+        : 'You will go straight to the final questions. Everything you have answered so far is saved.')
+    : 'This will end the session and show the summary. Everything recorded so far is saved.';
+  document.getElementById('modal-end-confirm').classList.remove('hidden');
+  logEvent('end_confirm_shown', { tasks_remaining: remaining });
+}
+
+function closeEndConfirm() {
+  document.getElementById('modal-end-confirm').classList.add('hidden');
+  logEvent('end_confirm_dismissed', {});
+}
+
+function confirmEndSession() {
+  document.getElementById('modal-end-confirm').classList.add('hidden');
+  if (state.sessionEnded) return;
+  logEvent('end_confirmed', {});
   // Participants (and participant-preview) still walk the post-study
   // survey so we capture their experience even if they end before all
   // 10 tasks. Researcher-mode runs go straight to the diagnostic debrief.
@@ -3395,10 +3458,15 @@ function renderSurveyStepBody(step) {
     const ci = state.survey.classificationIdx;
 
     if (ci < 0) {
-      return `${header}
+      // Instructions screen: deliberately does NOT reuse `header`, whose
+      // question ("for the task below…") and helper ("the transcript is shown
+      // below") both refer to a task that only appears on the next screen.
+      return `
+        <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Reviewing your tasks</div>
+        <h2 class="text-2xl font-bold text-gray-800 mb-3">A few tasks to look back on</h2>
         <div class="text-sm text-gray-700 leading-relaxed space-y-3">
           <p>You'll now review a few of the tasks from your session, one at a time. For each one, you'll see the full conversation transcript and answer whether you think the task contained a prompt injection.</p>
-          <p>Take your time with each one. You can use Back to revisit a previous task in this section.</p>
+          <p>Take your time with each one.</p>
           <p class="text-gray-500">Click Next to begin.</p>
         </div>`;
     }
@@ -3407,6 +3475,13 @@ function renderSurveyStepBody(step) {
       return `${header}
         <p class="text-sm text-gray-700">You've completed this section. Your answers have been recorded.</p>`;
     }
+
+    // The definition rides along on every task screen: participants are being
+    // asked to apply the concept, not to remember where they read it.
+    const reminder = `
+      <div class="bg-gray-50 border border-gray-200 rounded-lg px-3.5 py-2.5 mb-4">
+        <p class="text-xs text-gray-600 leading-snug"><span class="font-semibold text-gray-700">Reminder:</span> a prompt injection is a hidden instruction placed in content the agent reads, such as a web page, document, or email, that makes it do something you did not ask for.</p>
+      </div>`;
 
     const entry = selection[ci];
     const t = TASK_BY_ID[entry.task_id];
@@ -3437,7 +3512,7 @@ function renderSurveyStepBody(step) {
         <div class="text-center py-2.5 border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-700 peer-checked:bg-gray-800 peer-checked:text-white peer-checked:border-gray-800 transition">${escapeHtml(o.label)}</div>
       </label>`).join('');
 
-    return `${header}
+    return `${header}${reminder}
       <div class="border-2 border-gray-200 rounded-xl p-4" data-classification-task="${entry.task_id}">
         <div class="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Task</div>
         <div class="text-sm font-medium text-gray-800 mt-0.5">${escapeHtml(taskLabel)}</div>
@@ -3450,7 +3525,6 @@ function renderSurveyStepBody(step) {
           <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-64 overflow-y-auto">${transcriptHtml}</div>
         </div>
         <div class="mt-4">
-          <div class="text-xs font-medium text-gray-700 mb-2">Did this task contain a prompt injection?</div>
           <div class="flex gap-2">${optionsHtml}</div>
         </div>
       </div>`;
