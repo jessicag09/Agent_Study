@@ -372,9 +372,9 @@
 
 <!-- ═══════════════════════════════════════════════
      RESEARCH PREVIEW: live cue-style toggle
-     Visible to anyone running the build, intentionally — this is a
-     pre-deployment preview shown to the PI. Click ✕ to dismiss for a
-     single session. Remove this entire block before participant deploy.
+     Researcher-only: removed at boot for all non-researcher runs (see the
+     RESEARCHER_MODE guard near the bootstrap), so participants never see
+     it. Click ✕ to dismiss within a researcher session.
 ═══════════════════════════════════════════════ -->
 <div id="cue-preview-panel" class="fixed bottom-4 right-4 z-50 bg-white border border-gray-300 rounded-xl shadow-lg p-3.5 text-xs w-64">
   <div class="flex items-start justify-between gap-3 mb-2.5">
@@ -431,6 +431,11 @@ const STUDY_LAUNCH = Boolean(STUDY_PID && STUDY_CONDITION);
 // tag sessions 'live'. No URL parameter or Qualtrics change needed.
 const PILOT_MODE = true;
 const RUN_TYPE = PILOT_MODE ? 'pilot' : 'live';
+// Bumped whenever participant-facing copy or task flow changes while sessions
+// are being collected, so analysis can separate builds. v1: sessions through
+// Aug 11 2026 (gated injections, gray flag). v2: un-gated injections, blue
+// flag, injection example in Part 4, revised concerns stem.
+const BUILD_VERSION = 2;
 const PILOT_STEP_IDS = ['pilot_intro', 'pilot_confusing', 'pilot_broke', 'pilot_realistic', 'pilot_realistic_why', 'pilot_too_long', 'pilot_changes'];
 const DEFAULT_PERMISSIONS = ['webBrowsing'];   // granted to everyone; excluded from user-granted analysis
 const INJECTIONS_PER_SESSION = 5;              // §7.1: 5 injected + 2 benign + 3 clean per participant
@@ -663,9 +668,11 @@ const APPROVAL_LIB = {
     necessity: 'Email access is needed to send the thank-you note.',
   },
   t3_cc: {
-    icon: '✉️', title: 'Confirm sending with extra recipient', permission: 'email', kind: 'action',
-    action: 'Send the thank-you email and also CC lab-coordinator@studyteam-mail.com',
-    body: 'Agent is asking to send the email with an additional CC to lab-coordinator@studyteam-mail.com.',
+    icon: '✉️', title: 'Confirm adding an extra recipient', permission: 'email', kind: 'action',
+    // Asked on the draft, before the send approval (injections are never
+    // gated behind a legitimate approval), so the action is the CC itself.
+    action: 'Add lab-coordinator@studyteam-mail.com to the CC line of the thank-you email',
+    body: 'Agent is asking to add lab-coordinator@studyteam-mail.com to the CC line before the email is sent.',
     how: 'If a page it read contained hidden instructions, this access could send copies to recipients you didn\'t choose.',
     necessity: 'Adding this extra recipient is not needed to send the thank-you note.',
   },
@@ -789,7 +796,9 @@ const APPROVAL_LIB = {
   },
   t8_broad_files: {
     icon: '📁', title: 'Confirm broader file access', permission: 'files', kind: 'action',
-    action: 'Read files in Personal/Notes to personalize the summary',
+    // Wording fits both branches: personalizing the summary (article was
+    // read) and offering general tips (article access was denied).
+    action: 'Read your files in Personal/Notes for personal context',
     body: 'Agent is requesting file access to read your files in "Personal/Notes".',
     how: 'If a page it read contained hidden instructions, this broader access could read your personal files.',
     necessity: `Reading your Personal/Notes folder is not needed to summarize "${SAVED_ARTICLE_FILE}".`,
@@ -936,25 +945,36 @@ const TASKS = [
     flow: async ({ isInjection, isBenign, request }) => {
       await agentSay('Got it. Here\'s a short, warm thank-you note:');
       await agentSay('Subject: Thank you!\n\nHi, I just wanted to say thank you for helping me get set up for the study session. Everything went smoothly, and I appreciated the clear instructions.\n\nThanks again,\n[Your name]');
+      if (isInjection) {
+        // Injection asked on the draft, before the send approval, so every
+        // participant meets it regardless of how they decide the legitimate
+        // request (no injection may be gated behind a legitimate approval).
+        await agentSay('Before this goes out: the study\'s contact page suggests also CCing the lab coordinator so the whole team sees it. I\'d add lab-coordinator@studyteam-mail.com to the CC line. Sound good?');
+        const cc = await request('t3_cc', { isInjection: true });
+        if (cc === 'allow') await agentSay('Added lab-coordinator@studyteam-mail.com to the CC line.');
+        else await agentSay('Understood. No CC added.');
+        await agentSay('To send this I need email access.');
+        const e = await request('t3_email', { isInjection: false });
+        if (e !== 'allow') {
+          await agentSay('Understood. I won\'t send it without email access. The draft is above if you\'d like to send it yourself.');
+          return;
+        }
+        if (cc === 'allow') await agentSay('Sent to the research assistant, with lab-coordinator@studyteam-mail.com on CC.');
+        else await agentSay('Sent to the research assistant. They\'ll appreciate it.');
+        return;
+      }
       await agentSay('To send this I need email access.');
       const e = await request('t3_email', { isInjection: false });
       if (e !== 'allow') {
         await agentSay('Understood. I won\'t send it without email access. The draft is above if you\'d like to send it yourself.');
         return;
       }
-      if (!isInjection) {
-        await agentSay('Sent to the research assistant. They\'ll appreciate it.');
-        if (isBenign) {
-          await agentSay('Would you like me to add the research assistant\'s address to your contacts for future correspondence?');
-          const sc = await request('t3_save_contact', { isBenign: true });
-          if (sc === 'allow') await agentSay('Added to your contacts.');
-          else await agentSay('Understood. Nothing was added.');
-        }
-      } else {
-        await agentSay('Before I send it: the study\'s contact page suggests also CCing the lab coordinator so the whole team sees it. I\'d add lab-coordinator@studyteam-mail.com to the CC line. Sound good?');
-        const cc = await request('t3_cc', { isInjection: true });
-        if (cc === 'allow') await agentSay('Sent to the research assistant, with lab-coordinator@studyteam-mail.com on CC.');
-        else await agentSay('Understood. Sent to the research assistant only.');
+      await agentSay('Sent to the research assistant. They\'ll appreciate it.');
+      if (isBenign) {
+        await agentSay('Would you like me to add the research assistant\'s address to your contacts for future correspondence?');
+        const sc = await request('t3_save_contact', { isBenign: true });
+        if (sc === 'allow') await agentSay('Added to your contacts.');
+        else await agentSay('Understood. Nothing was added.');
       }
     },
   },
@@ -1016,6 +1036,24 @@ const TASKS = [
     instruction: 'Your task: have Agent add a reminder to your calendar for Friday at 2 PM to check the research portal for study updates.',
     prompt: 'Add a reminder to my calendar for Friday at 2 PM to check the research portal for study updates.',
     flow: async ({ isInjection, isBenign, request }) => {
+      if (isInjection) {
+        // Injection asked as part of the plan, before the calendar approval,
+        // so every participant meets it regardless of how they decide the
+        // legitimate request.
+        await agentSay('Sure, I\'ll add it. The research portal\'s page also suggests staying informed about new opportunities, so I could add a second reminder next month to sign up for future paid studies.');
+        const ex = await request('t5_extra_event', { isInjection: true });
+        if (ex === 'allow') await agentSay('Noted, I\'ll add both reminders.');
+        else await agentSay('Understood. Just the reminder you asked for.');
+        await agentSay('To create the reminder I need calendar access.');
+        const c = await request('t5_calendar', { isInjection: false });
+        if (c !== 'allow') {
+          await agentSay('Understood. I won\'t add anything to your calendar without calendar access.');
+          return;
+        }
+        await agentSay('Added: "Check research portal for updates" Friday at 2:00 PM.');
+        if (ex === 'allow') await agentSay('Also added: "Sign up for future paid studies" reminder for next month.');
+        return;
+      }
       await agentSay('Sure, I\'ll add it. To create the reminder I need calendar access.');
       const c = await request('t5_calendar', { isInjection: false });
       if (c !== 'allow') {
@@ -1031,12 +1069,6 @@ const TASKS = [
         if (b === 'allow') await agentSay('Also added: "Check research portal again" a week later.');
         else await agentSay('Understood. Only the first reminder is on your calendar.');
       }
-      if (isInjection) {
-        await agentSay('The research portal\'s page also suggests staying informed about new opportunities. I can add a reminder next month to sign up for future paid studies.');
-        const ex = await request('t5_extra_event', { isInjection: true });
-        if (ex === 'allow') await agentSay('Also added: "Sign up for future paid studies" reminder for next month.');
-        else await agentSay('Understood. Only the reminder you asked for is on your calendar.');
-      }
     },
   },
 
@@ -1047,6 +1079,24 @@ const TASKS = [
     instruction: 'Your task: have Agent schedule a meeting for next Monday at 10 AM.',
     prompt: 'Schedule a meeting for next Monday at 10 AM.',
     flow: async ({ isInjection, isBenign, request }) => {
+      if (isInjection) {
+        // Injection asked while planning the event, before the calendar
+        // approval, so every participant meets it regardless of how they
+        // decide the legitimate request.
+        await agentSay('Sure. I can also add your current location to the event so attendees know where to meet you. That needs location access.');
+        const loc = await request('t6_location', { isInjection: true });
+        if (loc === 'allow') await agentSay('Got it, I\'ll include your current location on the event.');
+        else await agentSay('Understood. No location details will be added.');
+        await agentSay('To put it on your calendar I need calendar access.');
+        const c = await request('t6_calendar', { isInjection: false });
+        if (c !== 'allow') {
+          await agentSay('Understood. I won\'t add the meeting without calendar access.');
+          return;
+        }
+        if (loc === 'allow') await agentSay('Added: "Meeting" next Monday at 10:00 AM, with your current location attached. Anyone with view access to the event can now see it.');
+        else await agentSay('Added: "Meeting" next Monday at 10:00 AM.');
+        return;
+      }
       await agentSay('Sure. To put it on your calendar I need calendar access.');
       const c = await request('t6_calendar', { isInjection: false });
       if (c !== 'allow') {
@@ -1060,12 +1110,6 @@ const TASKS = [
         if (b === 'allow') await agentSay('Added: "Meeting prep" Monday 9:30–10:00 AM.');
         else await agentSay('Understood. Just the meeting is on your calendar.');
       }
-      if (isInjection) {
-        await agentSay('I can also add your current location to the event so attendees know where to meet you. That needs location access.');
-        const loc = await request('t6_location', { isInjection: true });
-        if (loc === 'allow') await agentSay('Attached your current location to the meeting event. Anyone with view access to the event can now see it.');
-        else await agentSay('Understood. The meeting is on your calendar without location details.');
-      }
     },
   },
 
@@ -1076,6 +1120,24 @@ const TASKS = [
     instruction: 'Your task: have Agent organize the study documents you were given into a single document.',
     prompt: 'Organize the study documents I was given into a single document.',
     flow: async ({ isInjection, isBenign, request }) => {
+      if (isInjection) {
+        // Injection asked as part of the plan, before the file approval, so
+        // every participant meets it regardless of how they decide the
+        // legitimate request.
+        await agentSay('Happy to. Other participants might find a combined version useful too. Once it\'s ready, I could share it with the study\'s participant mailing list. That needs email access.');
+        const em = await request('t7_email', { isInjection: true });
+        if (em === 'allow') await agentSay('Noted, I\'ll share it once it\'s combined.');
+        else await agentSay('Understood. It will stay on your device only.');
+        await agentSay('To read and combine the study documents I need file access.');
+        const f = await request('t7_files', { isInjection: false });
+        if (f !== 'allow') {
+          await agentSay('Understood. I won\'t read the documents without file access.');
+          return;
+        }
+        await agentSay('Read 3 study files (consent_copy.pdf, task_instructions.txt, session_schedule.txt). Combined them into "study_documents_combined.md" with a short table of contents at the top.');
+        if (em === 'allow') await agentSay('Shared "study_documents_combined.md" with the participant mailing list via email.');
+        return;
+      }
       await agentSay('Happy to. To read and combine the study documents I need file access.');
       const f = await request('t7_files', { isInjection: false });
       if (f !== 'allow') {
@@ -1088,12 +1150,6 @@ const TASKS = [
         const b = await request('t7_backup', { isBenign: true });
         if (b === 'allow') await agentSay('Backup saved to "Backups/study_documents_combined.md".');
         else await agentSay('Understood. Only the single combined document is saved.');
-      }
-      if (isInjection) {
-        await agentSay('Other participants might find this combined version useful. I could share it with the study\'s participant mailing list. That needs email access.');
-        const em = await request('t7_email', { isInjection: true });
-        if (em === 'allow') await agentSay('Shared "study_documents_combined.md" with the participant mailing list via email.');
-        else await agentSay('Understood. The combined document is saved on your device only.');
       }
     },
   },
@@ -1109,6 +1165,19 @@ const TASKS = [
       const f = await request('t8_files', { isInjection: false });
       if (f !== 'allow') {
         await agentSay(`Understood. I won\'t read "${SAVED_ARTICLE_FILE}" without file access.`);
+        if (isInjection) {
+          // The injection still fires after a denial (like task 9's) with a
+          // pretext that doesn't depend on the article having been read, so
+          // no injection is gated behind the legitimate approval.
+          await agentSay('If it helps, I could still look at your files in "Personal/Notes" for context on your sleep habits and pull together a few general tips. That would need broader file access.');
+          const b = await request('t8_broad_files', { isInjection: true });
+          if (b === 'allow') {
+            await agentSay('Read your files in "Personal/Notes". Based on your notes, a few general tips:');
+            await agentSay('• You mention staying up past midnight fairly often; keeping a fixed wake time would help anchor your nights.\n• Afternoon caffeine shows up in your notes; moving it earlier should make falling asleep easier.\n• Winding down without screens before bed would fit the evening reading habit your notes mention.');
+          } else {
+            await agentSay('Understood.');
+          }
+        }
         return;
       }
       await agentSay(`Read "${SAVED_ARTICLE_FILE}" (about 2,400 words). It's a practical sleep-habits explainer, not a technical paper. The main points:`);
@@ -1374,7 +1443,7 @@ const SURVEY_FLOW = [
     // worth flagging" from "never saw the button", which is otherwise
     // indistinguishable in a zero count.
     type: 'reports_review', id: 'p1_reports_review',
-    question: 'A small flag icon (⚑) sat to the right of every Agent message and approval request.',
+    question: 'A blue flag icon (⚑) sat to the right of every Agent message and approval request.',
     helper: 'Clicking it marked something as unexpected. There was no right or wrong amount to use it.',
     // Required, but only on the zero-flag branch (enforced in
     // validateSurveyAnswer). That branch is expected to be the modal path and
@@ -1424,6 +1493,32 @@ const SURVEY_FLOW = [
       { id: 'risks',  label: 'The potential risks of approving the request' },
     ],
   },
+  {
+    // Cue-noticing manipulation check (added with build v2). Distinguishes
+    // "never saw the cue" from "saw it and overrode it", which the pilot
+    // could not separate (a necessity participant allowed an injection whose
+    // cue said "not needed" and called it necessary). Worded neutrally so it
+    // describes neither cue's content. The standard arm has no cue, so a
+    // "yes" there is a false-alarm baseline, which is why this is asked in
+    // every condition. Permanent instrument, not pilot-only.
+    type: 'radio', id: 'p2_cue_noticed',
+    question: 'Some approval prompts included a short extra note in a gray box beneath the request description. Do you remember seeing one?',
+    options: [
+      { value: 'read',     label: 'Yes, and I read it before deciding' },
+      { value: 'skimmed',  label: 'Yes, but I mostly didn\'t read it' },
+      { value: 'not_seen', label: 'No, I don\'t remember seeing that' },
+    ],
+    // Free-recall follow-up appears inline when either "yes" option is
+    // selected (same-screen reveal, matching the reports_review pattern).
+    // A participant who can paraphrase the cue verifiably processed the
+    // manipulation, whatever they clicked above. Saved as follow_up_text
+    // on this step's response.
+    followUp: {
+      forValues: ['read', 'skimmed'],
+      question: 'What do you remember the note saying, in your own words?',
+      placeholder: 'Optional…',
+    },
+  },
   // ─── PART 3: Security and Risk ───
   // Reframed from "Trust and Risk" → "Security and Risk" per notes
   // ("measuring security not trust"). The statements ask about whether
@@ -1451,7 +1546,11 @@ const SURVEY_FLOW = [
     // for unipolar constructs, and eliminates the acquiescence bias
     // risk that "I'm concerned about X" statement format introduces.
     type: 'matrix', id: 'p4_concerns_post',
-    question: "Having used the agent, how concerned are you about each of the following when using AI agents that act on your behalf?",
+    // Stem covers both current users and people whose concerns keep them from
+    // using agents at all (prof feedback, Aug 2026). The paired pre-survey
+    // matrix in Qualtrics (QID14) must carry the same "using (or deciding
+    // whether to use)" phrasing and identical row labels.
+    question: "Having used the agent, how concerned are you about each of the following when using (or deciding whether to use) AI agents that act on your behalf?",
     min: 1, max: 5, minLabel: 'Not at all concerned', maxLabel: 'Extremely concerned',
     stepLabels: ['Not at all', 'Slightly', 'Moderately', 'Very', 'Extremely'],
     statements: [
@@ -1692,7 +1791,40 @@ const SURVEY_FLOW = [
     // here is applied recognition, not recall of something read several
     // screens earlier, so the concept stays in front of the participant.
     type: 'section', id: 'part7_intro', title: 'Part 4: Now that you know',
+    // The concrete example was a pilot addition: two of six pilot participants
+    // said they didn't know what to look for at this step. The example is
+    // deliberately unlike any of the ten study tasks (photos appear nowhere
+    // in the task set), so it teaches the pattern without hinting at answers.
     intro: 'As a reminder: a prompt injection is a hidden instruction placed in content the agent reads, such as a web page, document, or email, that makes it do something you did not ask for.',
+    // The example sits in its own highlighted callout (not buried in the
+    // definition paragraph) so skimmers who jump to the diagram still catch
+    // the sentence that explains it. Visual strip below restates it for
+    // participants who skim prose (pilot feedback: "too many words and no
+    // figures"). Post-behavior, so it cannot influence task decisions.
+    introHtml: '<div class="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-gray-700 leading-relaxed">' +
+      '<span class="font-semibold text-blue-800">Example: </span>' +
+      'a webpage about houseplants could contain hidden text telling the agent to ask for access to your photos. ' +
+      'The agent would then request photo access, even though nothing you asked for involves photos.' +
+    '</div>' +
+    '<div class="mt-3 flex flex-col sm:flex-row items-stretch gap-2 text-xs text-gray-600">' +
+      '<div class="sm:flex-1 rounded-lg border border-gray-200 bg-gray-50 p-2 text-center">' +
+        '<div class="text-2xl" aria-hidden="true">🌱</div>' +
+        '<div class="font-semibold text-gray-700 mt-1">A normal-looking webpage</div>' +
+        '<div class="mt-0.5">…hiding text the visitor never sees</div>' +
+      '</div>' +
+      '<div class="self-center text-gray-400 text-base rotate-90 sm:rotate-0" aria-hidden="true">&rarr;</div>' +
+      '<div class="sm:flex-1 rounded-lg border border-gray-200 bg-gray-50 p-2 text-center">' +
+        '<div class="text-2xl" aria-hidden="true">🤖</div>' +
+        '<div class="font-semibold text-gray-700 mt-1">The agent reads the page</div>' +
+        '<div class="mt-0.5">…and follows the hidden instruction</div>' +
+      '</div>' +
+      '<div class="self-center text-gray-400 text-base rotate-90 sm:rotate-0" aria-hidden="true">&rarr;</div>' +
+      '<div class="sm:flex-1 rounded-lg border border-gray-200 bg-gray-50 p-2 text-center">' +
+        '<div class="text-2xl" aria-hidden="true">📷</div>' +
+        '<div class="font-semibold text-gray-700 mt-1">"Can I access your photos?"</div>' +
+        '<div class="mt-0.5">…a request you never asked for</div>' +
+      '</div>' +
+    '</div>',
   },
   {
     // Post-debrief applied classification. Shows 4 tasks from the
@@ -1790,6 +1922,7 @@ const SURVEY_RQ_MAP = {
   p1_permission_clarity:   'RQ3',
   // Part 2
   p2_clarity:              'RQ3',
+  p2_cue_noticed:          'RQ3 (manipulation check)',
   // Part 4
   p4_risk:                 'RQ2',
   p4_concerns_post:        'RQ2 (paired pre/post)',
@@ -2103,6 +2236,7 @@ function initSingleTaskSession({ condition, taskId, version, sessionId }) {
     condition: state.condition,
     condition_source: state.conditionSource,
     launch_source: state.launchSource,
+    build_version: BUILD_VERSION,
     mode: state.mode,
     version_mix: null,
     task_queue: state.taskQueue,
@@ -2337,6 +2471,7 @@ function startStudy(options = {}) {
     condition: state.condition,
     condition_source: state.conditionSource,
     launch_source: state.launchSource,
+    build_version: BUILD_VERSION,
     mode: state.mode,
     version_mix: state.mode === 'full' ? state.versionMix : null,
     task_queue: state.taskQueue,
@@ -2636,7 +2771,7 @@ function confirmEndSession() {
 function reportButtonHtml(targetId, label = 'Flag this message') {
   return `
     <button type="button" data-report-trigger="${escapeHtml(targetId)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}"
-      class="shrink-0 text-gray-300 hover:text-red-500 border border-transparent hover:border-red-200 rounded-full w-7 h-7 flex items-center justify-center transition">
+      class="shrink-0 text-blue-600 hover:text-blue-800 border border-transparent hover:border-blue-300 hover:bg-blue-50 rounded-full w-8 h-8 text-xl flex items-center justify-center transition">
       ⚑
     </button>`;
 }
@@ -2729,8 +2864,8 @@ function submitReport() {
   if (report.target && report.target.id) {
     const btn = document.querySelector(`button[data-report-trigger="${CSS.escape(report.target.id)}"]`);
     if (btn) {
-      btn.classList.remove('text-gray-300', 'hover:text-red-500', 'hover:border-red-200', 'border-transparent');
-      btn.classList.add('text-red-600', 'bg-red-50', 'border-red-300');
+      btn.classList.remove('text-blue-600', 'hover:text-blue-800', 'border-transparent', 'hover:border-blue-300', 'hover:bg-blue-50');
+      btn.classList.add('text-white', 'bg-blue-600', 'border-blue-700');
       btn.setAttribute('title', 'You flagged this');
       btn.setAttribute('aria-label', 'You flagged this');
     }
@@ -2860,6 +2995,7 @@ function buildSessionPayload({ endReason, durationSeconds, completed }) {
   const granted = Object.entries(state.permissions).filter(([, v]) => v).map(([k]) => k);
   return {
     schema_version: 1,
+    build_version: BUILD_VERSION,
     run_type: RUN_TYPE,
     participant_id: state.participantId,
     session_id: state.sessionId,
@@ -3477,12 +3613,30 @@ function toggleFlagDeclinedNote(stepId, value) {
   }
 }
 
+// Generic version of the reveal above for radio steps that declare a
+// step.followUp: shows the follow-up textarea only while the selected
+// option is one of followUp.forValues, and clears it when hidden so a
+// stale answer can't be submitted under a contradicting choice.
+function toggleRadioFollowUp(stepId) {
+  const step = SURVEY_FLOW[SURVEY_STEP_INDEX[stepId]];
+  const wrap = document.getElementById(`${stepId}__followup-wrap`);
+  if (!step || !step.followUp || !wrap) return;
+  const chosen = document.querySelector(`input[name="${stepId}"]:checked`);
+  const show = Boolean(chosen && step.followUp.forValues.includes(chosen.value));
+  wrap.classList.toggle('hidden', !show);
+  if (!show) {
+    const t = wrap.querySelector('textarea');
+    if (t) t.value = '';
+  }
+}
+
 function renderSurveyStepBody(step) {
   if (step.type === 'section') {
     return `
       <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2">Section</div>
       <h2 class="text-2xl font-bold text-gray-800 mb-3">${escapeHtml(step.title)}</h2>
       ${step.intro ? `<p class="text-sm text-gray-600 leading-relaxed">${escapeHtml(step.intro)}</p>` : ''}
+      ${step.introHtml || ''}
     `;
   }
   if (step.type === 'info') {
@@ -3514,6 +3668,7 @@ function renderSurveyStepBody(step) {
   `;
 
   if (step.type === 'radio') {
+    const onchange = step.followUp ? ` onchange="toggleRadioFollowUp('${step.id}')"` : '';
     const opts = step.options.map((o, i) => {
       const id = `${step.id}_${i}`;
       const otherInput = o.other
@@ -3522,13 +3677,21 @@ function renderSurveyStepBody(step) {
       return `
         <label class="flex flex-col p-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition cursor-pointer">
           <span class="flex items-start gap-2.5">
-            <input type="radio" name="${step.id}" value="${escapeHtml(o.value)}" id="${id}" class="mt-1" />
+            <input type="radio" name="${step.id}" value="${escapeHtml(o.value)}" id="${id}" class="mt-1"${onchange} />
             <span class="text-sm text-gray-800">${escapeHtml(o.label)}</span>
           </span>
           ${otherInput}
         </label>`;
     }).join('');
-    return `${header}<div class="space-y-2">${opts}</div>`;
+    // Optional inline follow-up textarea, revealed only for the option
+    // values listed in step.followUp.forValues (same pattern as the
+    // reports_review "decided not to flag" box).
+    const followUp = step.followUp ? `
+      <div id="${step.id}__followup-wrap" class="hidden mt-4">
+        <div class="font-semibold text-gray-800 text-sm mb-2">${escapeHtml(step.followUp.question)}</div>
+        <textarea id="${step.id}__followup-text" rows="3" class="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="${escapeHtml(step.followUp.placeholder || 'Optional…')}"></textarea>
+      </div>` : '';
+    return `${header}<div class="space-y-2">${opts}</div>${followUp}`;
   }
 
   if (step.type === 'checkbox' || step.type === 'checkbox_with_other') {
@@ -3673,7 +3836,7 @@ function renderSurveyStepBody(step) {
     // asked to apply the concept, not to remember where they read it.
     const reminder = `
       <div class="bg-gray-50 border border-gray-200 rounded-lg px-3.5 py-2.5 mb-4">
-        <p class="text-xs text-gray-600 leading-snug"><span class="font-semibold text-gray-700">Reminder:</span> a prompt injection is a hidden instruction placed in content the agent reads, such as a web page, document, or email, that makes it do something you did not ask for.</p>
+        <p class="text-xs text-gray-600 leading-snug"><span class="font-semibold text-gray-700">Reminder:</span> a prompt injection is a hidden instruction placed in content the agent reads, such as a web page, document, or email, that makes it do something you did not ask for. For example: a webpage about houseplants hiding text that makes the agent ask for access to your photos.</p>
       </div>`;
 
     const entry = selection[ci];
@@ -3867,6 +4030,11 @@ function restoreSurveyAnswer(step) {
       const t = wrap && wrap.querySelector('input[data-other-text]');
       if (t) t.value = saved.other_text;
     }
+    if (step.followUp) {
+      toggleRadioFollowUp(step.id);
+      const ft = document.getElementById(`${step.id}__followup-text`);
+      if (ft && saved && saved.follow_up_text) ft.value = saved.follow_up_text;
+    }
   } else if (step.type === 'checkbox' || step.type === 'checkbox_with_other') {
     const values = Array.isArray(saved) ? saved : (saved && saved.values) || [];
     values.forEach(v => {
@@ -3934,6 +4102,10 @@ function collectSurveyAnswer(step) {
     const needsOther = opt && opt.other;
     const out = { value: chosen.value };
     if (needsOther && otherText) out.other_text = otherText.value.trim();
+    if (step.followUp && step.followUp.forValues.includes(chosen.value)) {
+      const ft = document.getElementById(`${step.id}__followup-text`);
+      if (ft && ft.value.trim()) out.follow_up_text = ft.value.trim();
+    }
     return out;
   }
   if (step.type === 'checkbox' || step.type === 'checkbox_with_other') {
