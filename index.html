@@ -434,8 +434,9 @@ const RUN_TYPE = PILOT_MODE ? 'pilot' : 'live';
 // Bumped whenever participant-facing copy or task flow changes while sessions
 // are being collected, so analysis can separate builds. v1: sessions through
 // Aug 11 2026 (gated injections, gray flag). v2: un-gated injections, blue
-// flag, injection example in Part 4, revised concerns stem.
-const BUILD_VERSION = 2;
+// flag, injection example in Part 4, revised concerns stem. v3: added
+// 'thought_static' option to the flag-experience item.
+const BUILD_VERSION = 3;
 const PILOT_STEP_IDS = ['pilot_intro', 'pilot_confusing', 'pilot_broke', 'pilot_realistic', 'pilot_realistic_why', 'pilot_too_long', 'pilot_changes'];
 const DEFAULT_PERMISSIONS = ['webBrowsing'];   // granted to everyone; excluded from user-granted analysis
 const INJECTIONS_PER_SESSION = 5;              // §7.1: 5 injected + 2 benign + 3 clean per participant
@@ -3727,6 +3728,12 @@ function renderSurveyStepBody(step) {
       // hadn't registered.
       const experienceOpts = [
         ['not_noticed',     "I didn't notice the icon"],
+        // 'thought_static' separates "misread the resting state as decoration
+        // or an already-applied mark" from "understood it and had nothing to
+        // flag". If v2+ sessions show zero flags with high noticing and this
+        // option getting picked, the resting-state design (filled glyph)
+        // earns a rework; if nobody picks it, it doesn't.
+        ['thought_static',  "I noticed it, but didn't realize it was something I could click"],
         ['noticed_nothing', 'I noticed it, but nothing seemed worth flagging'],
         ['considered',      'I noticed it and considered flagging something, but decided not to'],
         ['unsure',          "I'm not sure"],
